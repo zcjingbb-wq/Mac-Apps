@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleName</key><string>蓝匣</string>
+<key>CFBundleDisplayName</key><string>蓝匣</string>
+<key>CFBundleIdentifier</key><string>com.jingzicheng.stashcat</string>
+<key>CFBundleExecutable</key><string>StashCat</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>2.0</string>
+<key>CFBundleVersion</key><string>18</string>
+<key>CFBundleIconFile</key><string>StashCatGlass</string>
+<key>LSMinimumSystemVersion</key><string>14.0</string>
+<key>LSUIElement</key><true/>
+<key>NSHighResolutionCapable</key><true/>
+<key>NSSupportsAutomaticTermination</key><false/>
+<key>NSSupportsSuddenTermination</key><false/>
+<key>NSHumanReadableCopyright</key><string>Personal local build, 2026. DeepSeek Harness and runtime licenses are included.</string>
+<key>NSScreenCaptureUsageDescription</key><string>仅在你主动选择窗口或屏幕后开始单次读取或持续观察。仅当你点击分析时才提交所选画面内容。持续会话可从菜单或快捷键停止。</string>
+<key>NSMicrophoneUsageDescription</key><string>仅在点击语音输入后使用麦克风，将你说的话转为文字；停止、取消或收起面板后结束录音。</string>
+<key>NSSpeechRecognitionUsageDescription</key><string>识别你的语音要求。默认仅使用设备端识别；只有你在设置中允许联网语音识别时才可使用 Apple 服务。</string>
+</dict></plist>
