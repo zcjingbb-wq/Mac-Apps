@@ -164,6 +164,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let target = StatusDropTarget(frame: button.bounds)
         target.autoresizingMask = [.width, .height]
         target.onClick = { [weak self] in self?.togglePopover() }
+        target.onHover = { [weak self] in
+            guard let self, !self.companionPanel.isVisible, NSApp.modalWindow == nil else { return }
+            self.showPopover()
+        }
         target.onFiles = { [weak self] urls in
             guard let self else { return }
             Task { await self.shelf.importURLs(urls) }
@@ -251,7 +255,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func updateScreenIndicator(fileCount: Int? = nil) {
         let active = screenSession.capture.isRunning || screenSession.capture.isSelecting || screenSession.capture.isStopping
-        let label = active ? "蓝匣 · 屏幕会话进行中 · 点击菜单栏可停止" : "蓝匣 · \(fileCount ?? shelf.items.count) 个暂存文件 · 可拖入文件"
+        let label = active ? "蓝匣 · 屏幕会话进行中 · 打开后可停止" : "蓝匣 · \(fileCount ?? shelf.items.count) 个暂存文件 · 悬停或点击打开 · 可拖入文件"
         statusItem?.button?.toolTip = label
         statusItem?.button?.setAccessibilityLabel("蓝匣")
         statusItem?.button?.setAccessibilityHelp(label)
@@ -314,7 +318,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc private func showCompression() { showCompanion(page: .files, focus: true) }
     @objc private func showAbout() {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0.1"
         NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "蓝匣", .applicationVersion: version, .credits: NSAttributedString(string: "菜单栏文件中转站 · DeepSeek Harness\n日程提醒 · ZIP 文件压缩 · Outlook 邮件")])
     }
 }
@@ -322,27 +326,4 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 final class CompanionPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
-}
-
-@MainActor
-final class StatusDropTarget: NSView {
-    var onClick: (() -> Void)?
-    var onFiles: (([URL]) -> Void)?
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        registerForDraggedTypes([.fileURL])
-        setAccessibilityElement(true)
-        setAccessibilityRole(.button)
-        setAccessibilityLabel("蓝匣，打开文件中转站")
-    }
-    required init?(coder: NSCoder) { fatalError() }
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-    override func mouseDown(with event: NSEvent) { onClick?() }
-    override func accessibilityPerformPress() -> Bool { onClick?(); return true }
-    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { .copy }
-    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        guard let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty else { return false }
-        onFiles?(urls)
-        return true
-    }
 }

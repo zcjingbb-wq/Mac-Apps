@@ -137,7 +137,7 @@ struct SettingsView: View {
                 Text("暂存站保存文件副本。移除暂存项时，副本会移到废纸篓。")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
             }
-            Text("蓝匣 2.0")
+            Text("蓝匣 \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0.1")")
                 .font(.system(size: 10)).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity).padding(.vertical, 5)
         }
