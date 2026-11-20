@@ -1,4 +1,4 @@
-# Apps inventation
+# Mac Apps
 
 个人应用集合。每个应用的目录包含源码、构建说明和更新日志。
 
