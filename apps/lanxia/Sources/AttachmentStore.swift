@@ -12,6 +12,13 @@ enum ChatAttachmentKind: String, Sendable {
     case image
 }
 
+struct ImageRecognitionResult: Sendable {
+    let pixelWidth: Int
+    let pixelHeight: Int
+    let recognizedText: String
+    let labels: [String]
+}
+
 /// An explicitly selected file. Only its extracted text and prepared image are sent to providers.
 struct ChatAttachment: Identifiable, Sendable {
     let id: UUID
@@ -21,6 +28,7 @@ struct ChatAttachment: Identifiable, Sendable {
     let notice: String?
     let isTruncated: Bool
     let imageURL: URL?
+    let imageRecognition: ImageRecognitionResult?
     let byteCount: Int64
     fileprivate let ownedDirectory: URL
 }
@@ -54,7 +62,7 @@ final class AttachmentStore: ObservableObject {
 
     deinit { try? FileManager.default.removeItem(at: cacheURL) }
 
-    func add(urls: [URL]) async {
+    func add(urls: [URL], imagesOnly: Bool = false) async {
         guard !isLoading else {
             errorMessage = "附件仍在读取，请稍候再添加。"
             return
@@ -76,7 +84,7 @@ final class AttachmentStore: ObservableObject {
             guard generation == operation else { break }
             let scoped = url.startAccessingSecurityScopedResource()
             let result = await Task.detached(priority: .userInitiated) {
-                Result { try AttachmentReader.read(url: url, cacheRoot: root) }
+                Result { try AttachmentReader.read(url: url, cacheRoot: root, imagesOnly: imagesOnly) }
             }.value
             if scoped { url.stopAccessingSecurityScopedResource() }
             guard generation == operation else {
@@ -121,22 +129,26 @@ private enum AttachmentReader {
         "kts", "m", "mm", "srt", "vtt", "ipynb", "conf", "cfg"
     ]
 
-    static func read(url: URL, cacheRoot: URL) throws -> ChatAttachment {
+    static func read(url: URL, cacheRoot: URL, imagesOnly: Bool) throws -> ChatAttachment {
         guard url.isFileURL else { throw AttachmentReadError.invalid("仅支持选择本机文件。") }
+        let ext = url.pathExtension.lowercased()
+        let type = UTType(filenameExtension: ext)
+        let isImage = type?.conforms(to: .image) == true
+        guard !imagesOnly || isImage else { throw AttachmentReadError.invalid("此处仅支持图片，请选择 PNG、JPEG 或 HEIC 等图片文件。") }
         let id = UUID()
         let directory = cacheRoot.appendingPathComponent(id.uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
                                                attributes: [.posixPermissions: 0o700])
         var succeeded = false
         defer { if !succeeded { try? FileManager.default.removeItem(at: directory) } }
-        let ext = url.pathExtension.lowercased()
         let source = directory.appendingPathComponent("source" + (ext.isEmpty ? "" : "." + ext))
         let byteCount = try copyRegularFile(url, to: source)
-        let type = UTType(filenameExtension: ext)
         let result: (String, String?, Bool, URL?, ChatAttachmentKind)
-        if type?.conforms(to: .image) == true {
+        var imageRecognition: ImageRecognitionResult?
+        if isImage {
             let image = try imageText(source, directory: directory)
             result = (image.text, image.notice, image.truncated, image.url, .image)
+            imageRecognition = image.recognition
         } else if ext == "pdf" {
             let text = try pdfText(source)
             result = (text.text, text.notice, text.truncated, nil, .document)
@@ -164,7 +176,8 @@ private enum AttachmentReader {
         succeeded = true
         return ChatAttachment(id: id, name: url.lastPathComponent, kind: result.4,
                               extractedText: result.0, notice: result.1, isTruncated: result.2,
-                              imageURL: result.3, byteCount: byteCount, ownedDirectory: directory)
+                              imageURL: result.3, imageRecognition: imageRecognition,
+                              byteCount: byteCount, ownedDirectory: directory)
     }
 
     /// O_NOFOLLOW + fstat keep symbolic links and special files out, including a replacement race.
@@ -287,7 +300,7 @@ private enum AttachmentReader {
         return delegate.text
     }
 
-    static func imageText(_ url: URL, directory: URL) throws -> (text: String, notice: String?, truncated: Bool, url: URL) {
+    static func imageText(_ url: URL, directory: URL) throws -> (text: String, notice: String?, truncated: Bool, url: URL, recognition: ImageRecognitionResult) {
         let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
@@ -323,7 +336,7 @@ private enum AttachmentReader {
         do {
             try handler.perform([recognition])
             recognizedText = (recognition.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
-        } catch { notices.append("OCR 未能完成，可使用在线 AI 查看已准备的图片。") }
+        } catch { notices.append("OCR 未能完成。") }
         do {
             try handler.perform([classifier])
             labels = (classifier.results ?? []).filter { $0.confidence >= 0.12 }.prefix(5).map { "\($0.identifier)（\(Int(($0.confidence * 100).rounded()))%）" }
@@ -335,7 +348,9 @@ private enum AttachmentReader {
         text += recognizedText.isEmpty ? "OCR：未识别到文字。" : "OCR 识别文字：\n" + recognizedText
         let bounded = limit(text)
         if bounded.truncated { notices.append("识别结果较长，只保留前 12000 字。") }
-        return (bounded.text, notices.joined(separator: " "), bounded.truncated, preparedURL)
+        let details = ImageRecognitionResult(pixelWidth: width, pixelHeight: height,
+                                             recognizedText: limit(recognizedText).text, labels: labels)
+        return (bounded.text, notices.joined(separator: " "), bounded.truncated, preparedURL, details)
     }
 }
 

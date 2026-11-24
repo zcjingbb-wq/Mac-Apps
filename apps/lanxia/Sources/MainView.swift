@@ -83,6 +83,7 @@ struct MenuShelfView: View {
 
             Divider().opacity(0.38).padding(.horizontal, 16)
             HStack(spacing: 20) {
+                Button { onOpen(.image) } label: { Label("识图", systemImage: "photo.viewfinder") }
                 Button { onOpen(.reminders) } label: {
                     Label(reminders.dueCount > 0 ? "日程 · \(reminders.dueCount) 项到期" : "日程", systemImage: "calendar")
                 }
@@ -137,7 +138,7 @@ struct SettingsView: View {
                 Text("暂存站保存文件副本。移除暂存项时，副本会移到废纸篓。")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
             }
-            Text("蓝匣 \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0.1")")
+            Text("蓝匣 \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.1.0")")
                 .font(.system(size: 10)).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity).padding(.vertical, 5)
         }

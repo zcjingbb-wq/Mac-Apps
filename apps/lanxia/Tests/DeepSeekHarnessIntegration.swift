@@ -47,11 +47,20 @@ enum DeepSeekHarnessIntegration {
         chat.setEnabled(true)
         let afterStop = await chat.send("中断后重试")
         try check(afterStop && chat.messages.count == 6, "重新开启后应能继续对话")
+        let fixtures = data.deletingLastPathComponent()
+        for filename in ["unreadable-image.png", "symbolic-image.png"] {
+            let invalid = await chat.send("无效图片不应到达服务", imageURLs: [fixtures.appendingPathComponent(filename)])
+            try check(!invalid && chat.isReady && chat.messages.count == 6, "错误或符号链接图片应在本机拒绝")
+        }
+        let vision = await chat.send("发送视觉测试图片", imageURLs: [fixtures.appendingPathComponent("vision-fixture.png")])
+        try check(vision && chat.messages.count == 8, "真实 SDK 应完成原图问答。\(chat.errorMessage ?? chat.statusText)")
+        let transcript = try String(contentsOf: data.appendingPathComponent("deepseek-history.json"), encoding: .utf8)
+        try check(!transcript.contains("vision-fixture") && transcript.utf8.count < 16_384, "聊天记录不得保存图像路径或字节")
         let authFailure = await chat.send("模拟鉴权失败")
-        try check(!authFailure && !chat.isReady && chat.authRequired && chat.messages.count == 6, "SDK 401 应提示配置并回滚失败消息")
+        try check(!authFailure && !chat.isReady && chat.authRequired && chat.messages.count == 8, "SDK 401 应提示配置并回滚失败消息")
         chat.shutdown()
         try check(!chat.isEnabled && !chat.isReady, "关闭后应回到未开启")
-        print("PASS Swift gate, SDK response, saved history, cancel, and re-enable.")
+        print("PASS Swift gate, SDK text and image responses, image validation, saved history, cancel, and re-enable.")
     }
 
     @MainActor

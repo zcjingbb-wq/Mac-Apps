@@ -26,6 +26,8 @@ struct CompanionView: View {
     @State private var signingIn = false
     @State private var confirmClear = false
     @StateObject private var attachments = AttachmentStore()
+    @StateObject private var recognizedImage = AttachmentStore()
+    @State private var isSendingImageQuestion = false
     @StateObject private var screenCapture = ScreenCaptureService()
     @StateObject private var screenQuestion = ScreenQuestionService()
     @State private var attachmentError: String?
@@ -38,6 +40,9 @@ struct CompanionView: View {
             Group {
                 switch page {
                 case .chat: conversation
+                case .image:
+                    ImageRecognitionView(store: recognizedImage, chat: chat, isSending: isSendingImageQuestion,
+                                         onAnalyze: analyzeRecognizedImage)
                 case .screen:
                     VStack(spacing: 0) {
                         Picker("屏幕读取方式", selection: $screenMode) {
@@ -90,7 +95,7 @@ struct CompanionView: View {
         .stashGlassPanelEdge()
         .tint(CatTheme.teal)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-            attachments.clear(); screenCapture.cancel(); screenQuestion.cancel()
+            attachments.clear(); recognizedImage.clear(); screenCapture.cancel(); screenQuestion.cancel()
         }
         .onReceive(NotificationCenter.default.publisher(for: .init("StashCatEndScreenCapture"))) { _ in
             screenCapture.cancel()
@@ -504,7 +509,7 @@ struct CompanionView: View {
                 .font(.system(size: 10)).foregroundStyle(.secondary)
             HStack(spacing: 9) {
                 Button { chooseAttachments(imagesOnly: false) } label: { Label("读取文件", systemImage: "doc.text.magnifyingglass") }
-                Button { chooseAttachments(imagesOnly: true) } label: { Label("识别图片", systemImage: "photo") }
+                Button { page = .image } label: { Label("识图", systemImage: "photo.viewfinder") }
             }.font(.system(size: 11)).disabled(chat.isGenerating || attachments.isLoading || attachments.items.count >= 4)
         }.padding(13).frame(maxWidth: .infinity, alignment: .leading)
             .stashGlassSurface(cornerRadius: 15)
@@ -535,6 +540,28 @@ struct CompanionView: View {
         Task { await attachments.add(urls: urls) }
     }
 
+    private func analyzeRecognizedImage(_ item: ChatAttachment, _ question: String) {
+        guard page == .image, recognizedImage.items.first?.id == item.id, item.imageURL != nil,
+              chat.isEnabled, !chat.isGenerating, !chat.authRequired, !isSendingImageQuestion else { return }
+        let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        let provider = chat.provider
+        do {
+            let prepared = try AttachmentPrompt.prepare(
+                question: trimmed.isEmpty ? "请描述这张图片的主要内容，提取重要文字，并指出不确定的地方。" : trimmed,
+                items: [item], online: true)
+            recognizedImage.errorMessage = nil
+            isSendingImageQuestion = true
+            page = .chat
+            Task {
+                defer { isSendingImageQuestion = false }
+                guard chat.isEnabled, chat.provider == provider else { return }
+                await chat.send(prepared.text, imageURLs: prepared.imageURLs, hasAttachments: true)
+            }
+        } catch {
+            recognizedImage.errorMessage = error.localizedDescription
+        }
+    }
+
     private func analyzeScreen(_ url: URL, _ question: String) {
         guard chat.isEnabled, page == .screen, !chat.isGenerating, !chat.authRequired, !screenQuestion.isPreparing else { return }
         let provider = chat.provider
@@ -563,12 +590,13 @@ struct CompanionView: View {
 }
 
 enum CompanionPage: String, CaseIterable, Identifiable {
-    case chat, files, reminders, mail, screen
+    case chat, files, image, reminders, mail, screen
     var id: String { rawValue }
     var title: String {
         switch self {
         case .chat: "聊天"
         case .files: "文件"
+        case .image: "识图"
         case .reminders: "日程"
         case .mail: "邮件"
         case .screen: "屏幕"
@@ -578,6 +606,7 @@ enum CompanionPage: String, CaseIterable, Identifiable {
         switch self {
         case .chat: "bubble.left.and.bubble.right"
         case .files: "tray"
+        case .image: "photo.viewfinder"
         case .reminders: "calendar"
         case .mail: "envelope"
         case .screen: "viewfinder"

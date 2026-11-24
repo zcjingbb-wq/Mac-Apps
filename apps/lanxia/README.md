@@ -2,6 +2,10 @@
 
 蓝匣（原暂存喵）是 Apple Silicon Mac 上的菜单栏工具。鼠标在蓝黄像素图标上停留约 0.35 秒会打开文件中转站。也可点击图标打开，或直接把文件拖到图标上暂存。首页提供添加、搜索、ZIP 压缩、日程提醒与 Outlook 邮件入口。
 
+## 识图
+
+从菜单栏首页点「识图」，选择、拖入或粘贴一张图片。蓝匣在本机显示图片预览、尺寸、识别文字和候选标签，可一键复制文字。开启 AI 后，可以输入问题，再点「解读」将当前图片发送给 DeepSeek 或 Codex。识图页会在发送前标明接收方。
+
 ## 按需开启 AI
 
 1. 从菜单栏打开蓝匣，再点「开启 AI」。每次启动蓝匣后，AI 都默认关闭。
@@ -9,7 +13,7 @@
 3. 输入问题后点发送。附件先选取和预览，邮件摘要需确认，屏幕助手需手动选择画面和点击分析。语音转写先填入聊天草稿。
 4. 使用首页「关闭 AI」或偏好设置「关闭本次运行的 AI」结束服务和当前屏幕会话。
 
-DeepSeek 路径使用官方 [DeepSeek Harness 0.2.2-rc.5](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.2-rc.5) 与 DeepSeek API。图片附件与屏幕画面在设备端提取文字，再按操作发送文字给 DeepSeek。Codex 路径可发送所选图片。两个提供方的对话记录在本机分别保存。
+DeepSeek 路径使用官方 [DeepSeek Harness 0.2.2-rc.5](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.2-rc.5) 与 DeepSeek API。在聊天附件和屏幕助手中，DeepSeek 接收由设备提取的文字。Codex 可接收所选图片。两个提供方的对话记录在本机分别保存。
 
 暂存文件、副本、提醒、邮件缓存及对话历史位于 `~/Library/Application Support/StashCat`。旧对话记录可在那里查阅。菜单栏图标以 GBA 像素风绘制，取材自第四世代先机球。应用图标将同一像素球置于深蓝玻璃底与托盘上。
 

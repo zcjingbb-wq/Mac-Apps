@@ -4,6 +4,7 @@ import Darwin
 enum HarnessError: LocalizedError, Equatable {
     case missingKey, invalidKeyFormat, keychainError, rejectedKey, insufficientBalance
     case missingRuntime, launchFailed, interrupted, protocolError, timeout, remoteError, rateLimited, emptyAnswer
+    case invalidImage, imageLimitExceeded
 
     var errorDescription: String? {
         switch self {
@@ -20,6 +21,8 @@ enum HarnessError: LocalizedError, Equatable {
         case .remoteError: return "DeepSeek 未能完成请求，请检查网络和 API 账户后重试。"
         case .rateLimited: return "DeepSeek API 请求暂时受限，请稍后重试。"
         case .emptyAnswer: return "DeepSeek 没有返回可显示的回答。"
+        case .invalidImage: return "无法读取待发送的图片，请重新选择后再试。"
+        case .imageLimitExceeded: return "每次最多发送 4 张图片，处理后的图片合计不能超过 20 MB。"
         }
     }
 
@@ -50,6 +53,39 @@ struct HarnessRuntime {
         FileManager.default.isExecutableFile(atPath: node.path)
             && FileManager.default.isReadableFile(atPath: entry.path)
             && FileManager.default.isReadableFile(atPath: patch.path)
+    }
+}
+
+/// Reads only the private PNG/JPEG representations prepared by the attachment store.
+struct HarnessPromptImage: Sendable {
+    let mimeType: String
+    let data: String
+
+    static func load(_ urls: [URL]) throws -> [HarnessPromptImage] {
+        guard urls.count <= 4 else { throw HarnessError.imageLimitExceeded }
+        var remaining = 20 * 1_024 * 1_024
+        return try urls.map { url in
+            guard url.isFileURL else { throw HarnessError.invalidImage }
+            let descriptor = url.path.withCString { Darwin.open($0, O_RDONLY | O_NOFOLLOW | O_NONBLOCK) }
+            guard descriptor >= 0 else { throw HarnessError.invalidImage }
+            let file = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+            defer { try? file.close() }
+            var info = stat()
+            guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG, info.st_size > 0 else {
+                throw HarnessError.invalidImage
+            }
+            guard info.st_size <= remaining else { throw HarnessError.imageLimitExceeded }
+            guard let bytes = try? file.read(upToCount: remaining + 1), !bytes.isEmpty else {
+                throw HarnessError.invalidImage
+            }
+            guard bytes.count <= remaining else { throw HarnessError.imageLimitExceeded }
+            let mimeType: String
+            if bytes.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) { mimeType = "image/png" }
+            else if bytes.starts(with: [0xFF, 0xD8, 0xFF]) { mimeType = "image/jpeg" }
+            else { throw HarnessError.invalidImage }
+            remaining -= bytes.count
+            return HarnessPromptImage(mimeType: mimeType, data: bytes.base64EncodedString())
+        }
     }
 }
 
@@ -119,10 +155,12 @@ final class HarnessTransport {
         try Task.checkCancellation()
         guard !closed, pending == nil else { throw HarnessError.interrupted }
         requestID += 1
+        let currentRequest = requestID
         var frame = try JSONSerialization.data(withJSONObject: [
-            "jsonrpc": "2.0", "id": requestID, "method": method, "params": parameters
-        ])
+            "jsonrpc": "2.0", "id": currentRequest, "method": method, "params": parameters
+        ], options: .withoutEscapingSlashes)
         frame.append(10)
+        let bytes = frame
 
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
@@ -132,8 +170,29 @@ final class HarnessTransport {
                     catch { return }
                     self?.finish(.failure(HarnessError.timeout))
                 }
-                do { try self.input.write(contentsOf: frame) }
-                catch { self.finish(.failure(HarnessError.interrupted)) }
+                // Image frames can exceed the pipe buffer. Use a separate descriptor so
+                // cancellation can close the transport while the background write unwinds.
+                let descriptor = dup(self.input.fileDescriptor)
+                guard descriptor >= 0 else {
+                    self.finish(.failure(HarnessError.interrupted))
+                    return
+                }
+                guard fcntl(descriptor, F_SETNOSIGPIPE, 1) >= 0 else {
+                    Darwin.close(descriptor)
+                    self.finish(.failure(HarnessError.interrupted))
+                    return
+                }
+                let writer = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+                DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                    defer { try? writer.close() }
+                    do { try writer.write(contentsOf: bytes) }
+                    catch {
+                        DispatchQueue.main.async { [weak self] in
+                            guard let self, self.requestID == currentRequest else { return }
+                            self.finish(.failure(HarnessError.interrupted))
+                        }
+                    }
+                }
             }
         } onCancel: {
             Task { @MainActor [weak self] in self?.close() }

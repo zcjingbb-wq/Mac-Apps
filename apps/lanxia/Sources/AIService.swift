@@ -85,7 +85,7 @@ final class AIService: ObservableObject {
         statusText = "请先设置 DeepSeek API Key"
     }
 
-    func send(_ input: String) async {
+    func send(_ input: String, imageURLs: [URL] = []) async {
         let question = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !question.isEmpty, !isGenerating else { return }
         guard question.count <= 20_000 else {
@@ -107,6 +107,18 @@ final class AIService: ObservableObject {
         }
         do {
             let (runtime, key) = try prepareToSend()
+            let images: [HarnessPromptImage]
+            if imageURLs.isEmpty {
+                images = []
+            } else {
+                isGenerating = true
+                statusText = "正在准备发送图片…"
+                images = try await Task.detached(priority: .userInitiated) {
+                    try HarnessPromptImage.load(imageURLs)
+                }.value
+                guard turnID == turn else { return }
+                try Task.checkCancellation()
+            }
             let prompt = promptWithHistory(question)
             let pending = ChatMessage(role: "user", content: question)
             pendingMessageID = pending.id
@@ -127,9 +139,11 @@ final class AIService: ObservableObject {
             }
             guard turnID == turn else { return }
             statusText = "DeepSeek 正在回答…"
+            var contentBlocks = [["type": "text", "text": prompt]]
+            contentBlocks += images.map { ["type": "image", "mimeType": $0.mimeType, "data": $0.data] }
             let receipt = try await process.request("session/prompt", [
                 "sessionId": process.sessionID,
-                "contentBlocks": [["type": "text", "text": prompt]]
+                "contentBlocks": contentBlocks
             ], timeoutSeconds: 20)
             guard let messageID = receipt["messageId"] as? String, !messageID.isEmpty else {
                 throw HarnessError.protocolError

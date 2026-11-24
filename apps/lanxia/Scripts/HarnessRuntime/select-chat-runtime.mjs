@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
 const install = resolve(process.argv[2]);
@@ -59,3 +59,14 @@ for (const path of queue) {
 for (const path of available) {
     if (!retained.has(path)) rmSync(join(install, path), { recursive: true, force: true });
 }
+
+// The pinned adapter defaults to uploading image attachments to the Files API.
+// Send confirmed images inline in the model request without creating a remote file.
+const adapterPath = "node_modules/@deepseek-ai/dsh-llm-deepseek";
+const adapter = join(install, adapterPath, "lib/index.js");
+const original = readFileSync(adapter, "utf8");
+const uploadFirst = "let inline = false;";
+if (lock.packages[adapterPath]?.version !== "0.2.2-rc.5" || original.split(uploadFirst).length !== 2) {
+    throw new Error("Review inline image handling for this DeepSeek adapter version");
+}
+writeFileSync(adapter, original.replace(uploadFirst, "let inline = versions.size > 0;"));

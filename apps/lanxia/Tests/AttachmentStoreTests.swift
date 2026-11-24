@@ -31,7 +31,7 @@ struct AttachmentStoreTests {
         await store.add(urls: [textURL])
         try require(store.items.count == 1 && store.items[0].kind == .document, "Plain text loads")
         try require(store.items[0].extractedText.contains("积分与日程提醒"), "UTF-8 Chinese survives")
-        try require(store.items[0].imageURL == nil && !store.items[0].isTruncated, "Text is not represented as an image")
+        try require(store.items[0].imageURL == nil && store.items[0].imageRecognition == nil && !store.items[0].isTruncated, "Text is not represented as an image")
         try require(store.items[0].byteCount == original.count, "Original byte count is exact")
         let firstID = store.items[0].id
         try Data("later edit".utf8).write(to: textURL)
@@ -118,11 +118,23 @@ struct AttachmentStoreTests {
         store.clear()
         try require(store.items.isEmpty && !store.isLoading && store.errorMessage == nil, "Clear resets state")
 
+        await store.add(urls: [textURL, pdf], imagesOnly: true)
+        try require(store.items.isEmpty && store.errorMessage?.contains("仅支持图片") == true, "Image-only recognition rejects documents")
+        let corruptImage = source.appendingPathComponent("corrupt.png")
+        try original.write(to: corruptImage)
+        await store.add(urls: [corruptImage], imagesOnly: true)
+        try require(store.items.isEmpty && store.errorMessage?.contains("图片无法解码") == true, "Image-only recognition verifies contents despite the extension")
+
         let image = source.appendingPathComponent("OCR.png")
         let imageData = try makeImage(image, text: "STASHCAT FILE TEST 2026\n日程提醒 图片识别")
-        await store.add(urls: [image])
+        await store.add(urls: [image], imagesOnly: true)
         try require(store.items.count == 1 && store.items[0].kind == .image, "PNG loads as image")
         let attachment = store.items[0]
+        guard let recognition = attachment.imageRecognition else { throw AttachmentTestFailure.failed("Missing structured image result") }
+        try require(recognition.pixelWidth == 2_400 && recognition.pixelHeight == 900, "Structured dimensions report the source pixels")
+        try require(recognition.recognizedText.uppercased().contains("STASHCAT") && recognition.recognizedText.contains("2026"), "Structured OCR preserves recognized text")
+        try require(!recognition.recognizedText.contains("图片尺寸：") && !recognition.recognizedText.contains("OCR 识别文字："), "Structured OCR omits generated headings")
+        try require(recognition.labels.allSatisfy { attachment.extractedText.contains($0) }, "Structured tags also remain in chat extraction")
         try require(attachment.extractedText.uppercased().contains("STASHCAT") && attachment.extractedText.contains("2026"), "Real Apple Vision OCR reads synthetic English")
         try require(attachment.extractedText.contains("日程") || attachment.extractedText.contains("图片"), "Real Apple Vision OCR reads synthetic Chinese")
         try require(attachment.notice?.contains("视觉大模型") == true, "OCR limitations are explicit")
@@ -154,6 +166,7 @@ struct AttachmentStoreTests {
             throw AttachmentTestFailure.failed("Oriented JPEG preparation")
         }
         try require((orientedInfo[kCGImagePropertyPixelHeight] as? Int ?? 0) > (orientedInfo[kCGImagePropertyPixelWidth] as? Int ?? 0), "EXIF orientation is applied to pixels")
+        try require(store.items.first?.imageRecognition != nil, "Normal chat imports also provide the structured result")
         try require(orientedInfo[kCGImagePropertyGPSDictionary] == nil, "Actual JPEG GPS metadata is stripped")
         store.clear()
 

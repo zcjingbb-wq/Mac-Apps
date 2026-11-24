@@ -318,7 +318,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc private func showCompression() { showCompanion(page: .files, focus: true) }
     @objc private func showAbout() {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0.1"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.1.0"
         NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "蓝匣", .applicationVersion: version, .credits: NSAttributedString(string: "菜单栏文件中转站 · DeepSeek Harness\n日程提醒 · ZIP 文件压缩 · Outlook 邮件")])
     }
 }

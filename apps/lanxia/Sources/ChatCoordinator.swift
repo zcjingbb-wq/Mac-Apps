@@ -85,7 +85,7 @@ final class ChatCoordinator: ObservableObject {
         activeSend = token
         defer { if activeSend == token { activeSend = nil } }
 
-        if provider == .deepseek { await deepseek.send(question) }
+        if provider == .deepseek { await deepseek.send(question, imageURLs: imageURLs) }
         else { await codex.send(question, imageURLs: imageURLs) }
 
         return isEnabled && activeSend == token && provider == sendingProvider && errorMessage == nil
