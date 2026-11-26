@@ -1,91 +1,51 @@
 import AppKit
 
 @MainActor enum StatusBarIcon {
-    static let frames = [leafHare, emberFox, waveOtter].map(makeImage)
+    static func image() -> NSImage { wing }
 
-    static func image() -> NSImage {
-        frames[0]
-    }
+    // One pixel per point at 1×, with corners and feather tips on the same grid at 2×.
+    private static let pixels = [
+        "..................",
+        "..................",
+        "...............##.",
+        ".............####.",
+        "...........#####..",
+        ".........######...",
+        ".......#######....",
+        "......######......",
+        ".....##########...",
+        "....##########....",
+        "...#########......",
+        "...#######........",
+        "..##########......",
+        "..########........",
+        "...#####..........",
+        "....##............",
+        "..................",
+        ".................."
+    ]
 
-    private static func makeImage(pixels: [String]) -> NSImage {
-        let size = NSSize(width: 18, height: 18)
-        let image = NSImage(size: size, flipped: true) { rect in
-            NSGraphicsContext.saveGraphicsState()
-            defer { NSGraphicsContext.restoreGraphicsState() }
-            NSGraphicsContext.current?.shouldAntialias = false
-            NSColor.black.setFill()
+    private static let wing: NSImage = {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { rect in
+            guard let graphics = NSGraphicsContext.current else { return false }
+            let context = graphics.cgContext
+            context.saveGState()
+            defer { context.restoreGState() }
+            context.setShouldAntialias(false)
+            context.translateBy(x: rect.minX, y: rect.minY)
+            context.scaleBy(x: rect.width / 18, y: rect.height / 18)
+            context.setFillColor(NSColor.black.cgColor)
 
-            // Each sprite uses a 16-point grid with a one-point transparent border.
-            let width = rect.width / size.width
-            let height = rect.height / size.height
             for (row, line) in pixels.enumerated() {
                 for (column, pixel) in line.enumerated() where pixel == "#" {
-                    NSRect(x: rect.minX + CGFloat(column + 1) * width,
-                           y: rect.minY + CGFloat(row + 1) * height,
-                           width: width, height: height).fill()
+                    context.addRect(CGRect(x: column, y: row, width: 1, height: 1))
                 }
             }
+            context.fillPath()
             return true
         }
         image.isTemplate = true
-        image.accessibilityDescription = "蓝匣"
+        image.accessibilityDescription = "羽"
         return image
-    }
-
-    private static let leafHare = [
-        "................",
-        ".......#...##...",
-        "......###.###...",
-        "......##.###....",
-        "......##.##.....",
-        ".......###......",
-        ".......#####....",
-        ".....########...",
-        "....#######.##..",
-        "...############.",
-        ".#.############.",
-        ".#############..",
-        "..###########...",
-        "...###########..",
-        "....###..#####..",
-        "................"
-    ]
-
-    private static let emberFox = [
-        "................",
-        ".............#..",
-        "..##.##.....##..",
-        "..##.###...##.#.",
-        "..######..##.##.",
-        "..##.###..#####.",
-        ".########...###.",
-        "..###########...",
-        "...##########...",
-        ".....########...",
-        ".....########...",
-        ".....###...##...",
-        ".....##....###..",
-        "....###...###...",
-        "................",
-        "................"
-    ]
-
-    private static let waveOtter = [
-        "................",
-        "................",
-        ".........#..#...",
-        "........######..",
-        ".......###.####.",
-        ".......########.",
-        "...##.####.###..",
-        "..###########...",
-        "...#######......",
-        "....########....",
-        ".##...###..##...",
-        "###..####.####..",
-        "###########.###.",
-        ".####..#######..",
-        "...##....###....",
-        "................"
-    ]
+    }()
 }

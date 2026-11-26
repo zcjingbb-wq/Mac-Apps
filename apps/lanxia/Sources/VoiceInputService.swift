@@ -54,7 +54,7 @@ final class VoiceInputService: ObservableObject {
         session = newSession
         let onDevice = newSession.supportsOnDeviceRecognition
         guard onDevice || defaults.bool(forKey: "voiceAllowNetworkRecognition") else {
-            fail("此 Mac 暂不支持本机中文识别。可先在系统设置中下载中文听写资源，或在蓝匣的语音设置中明确开启“允许 Apple 在线语音识别”后重试。当前没有启用麦克风。", id: id)
+            fail("此 Mac 暂不支持本机中文识别。可先在系统设置中下载中文听写资源，或在羽的语音设置中明确开启“允许 Apple 在线语音识别”后重试。当前没有启用麦克风。", id: id)
             return
         }
         guard newSession.isAvailable else {
@@ -71,7 +71,7 @@ final class VoiceInputService: ObservableObject {
         guard authorization == .authorized else {
             let reason = authorization == .restricted
                 ? "语音识别受到系统限制，请检查屏幕使用时间或设备管理设置。"
-                : "尚未允许语音识别。请在系统设置 → 隐私与安全性 → 语音识别中允许蓝匣。"
+                : "尚未允许语音识别。请在系统设置 → 隐私与安全性 → 语音识别中允许羽。"
             fail(reason, id: id)
             return
         }
@@ -83,7 +83,7 @@ final class VoiceInputService: ObservableObject {
             return
         }
         guard microphoneAllowed else {
-            fail("尚未允许麦克风。请在系统设置 → 隐私与安全性 → 麦克风中允许蓝匣。", id: id)
+            fail("尚未允许麦克风。请在系统设置 → 隐私与安全性 → 麦克风中允许羽。", id: id)
             return
         }
 

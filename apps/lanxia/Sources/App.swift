@@ -28,8 +28,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusDropTarget: StatusDropTarget?
     private lazy var chat = ChatCoordinator(deepseek: ai, codex: codex)
     private var statusItem: NSStatusItem!
-    private var statusIconTimer: Timer?
-    private var statusIconIndex = 0
     private var companionPanel: CompanionPanel!
     private let panelSize = NSSize(width: 420, height: 560)
     private var isWaitingForCompressionToQuit = false
@@ -85,7 +83,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        statusIconTimer?.invalidate()
         if let dwellEventMonitor { NSEvent.removeMonitor(dwellEventMonitor) }
         stopAllScreenAccess(); voiceInput.cancel(); ArchiveService.shared.cancel(); chat.shutdown()
     }
@@ -112,9 +109,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "关于蓝匣", action: #selector(showAbout), keyEquivalent: "")
+        appMenu.addItem(withTitle: "关于羽", action: #selector(showAbout), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "打开蓝匣", action: #selector(openMain), keyEquivalent: "0")
+        appMenu.addItem(withTitle: "打开羽", action: #selector(openMain), keyEquivalent: "0")
         let shelfShortcut = NSMenuItem(title: "菜单栏中转站", action: #selector(openShelfPopover), keyEquivalent: "f")
         shelfShortcut.keyEquivalentModifierMask = [.command, .shift]
         appMenu.addItem(shelfShortcut)
@@ -129,7 +126,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(stopScreenShortcut)
         appMenu.addItem(withTitle: "设置…", action: #selector(openSettings), keyEquivalent: ",")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "退出蓝匣", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "退出羽", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appMenu.items.forEach { if $0.action != #selector(NSApplication.terminate(_:)) { $0.target = self } }
         appItem.submenu = appMenu
         menu.addItem(appItem)
@@ -148,7 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupCompanionPanel() {
         companionPanel = CompanionPanel(contentRect: NSRect(x: 0, y: 0, width: panelSize.width, height: panelSize.height), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        companionPanel.title = "蓝匣主面板"
+        companionPanel.title = "羽主面板"
         companionPanel.identifier = .lanxiaPanel
         companionPanel.isReleasedWhenClosed = false
         companionPanel.isOpaque = false
@@ -192,18 +189,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         button.addSubview(target)
         statusDropTarget = target
         updateScreenIndicator()
-        let timer = Timer(timeInterval: 4, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.advanceStatusIcon() }
-        }
-        timer.tolerance = 0.25
-        RunLoop.main.add(timer, forMode: .common)
-        statusIconTimer = timer
-    }
-
-    private func advanceStatusIcon() {
-        let frames = StatusBarIcon.frames
-        statusIconIndex = (statusIconIndex + 1) % frames.count
-        statusItem.button?.image = frames[statusIconIndex]
     }
 
     private func activateAI() {
@@ -272,11 +257,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func updateScreenIndicator(fileCount: Int? = nil) {
         let active = screenSession.capture.isRunning || screenSession.capture.isSelecting || screenSession.capture.isStopping
-        let label = active ? "蓝匣 · 屏幕会话进行中 · 打开后可停止" : "蓝匣 · \(fileCount ?? shelf.items.count) 个暂存文件 · 悬停或点击打开 · 可拖入文件"
+        let label = active ? "羽 · 屏幕会话进行中 · 打开后可停止" : "羽 · \(fileCount ?? shelf.items.count) 个暂存文件 · 悬停或点击打开 · 可拖入文件"
         statusItem?.button?.toolTip = label
-        statusItem?.button?.setAccessibilityLabel("蓝匣")
+        statusItem?.button?.setAccessibilityLabel("羽")
         statusItem?.button?.setAccessibilityHelp(label)
-        statusDropTarget?.setAccessibilityLabel("蓝匣")
+        statusDropTarget?.setAccessibilityLabel("羽")
         statusDropTarget?.setAccessibilityHelp(label)
     }
 
@@ -342,8 +327,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc private func showCompression() { showCompanion(page: .files, focus: true) }
     @objc private func showAbout() {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.2.1"
-        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "蓝匣", .applicationVersion: version, .credits: NSAttributedString(string: "菜单栏文件中转站 · DeepSeek Harness\n日程提醒 · ZIP 文件压缩 · Outlook 邮件")])
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.2.2"
+        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "羽", .applicationVersion: version, .credits: NSAttributedString(string: "菜单栏文件中转站 · DeepSeek Harness\n日程提醒 · ZIP 文件压缩 · Outlook 邮件")])
     }
 }
 

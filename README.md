@@ -4,4 +4,4 @@
 
 | 应用 | 平台 | 用途 | 更新日志 |
 | --- | --- | --- | --- |
-| [蓝匣](apps/lanxia/) | macOS · Apple Silicon | 菜单栏文件中转站，支持 ZIP 压缩、日程和按需启用的 AI | [CHANGELOG.md](apps/lanxia/CHANGELOG.md) |
+| [羽](apps/lanxia/) | macOS · Apple Silicon | 菜单栏文件中转站，支持 ZIP 压缩、日程和按需启用的 AI | [CHANGELOG.md](apps/lanxia/CHANGELOG.md) |

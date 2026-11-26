@@ -66,7 +66,7 @@ final class AIService: ObservableObject {
         if updated == errSecItemNotFound {
             var item = Self.keychainQuery
             item[kSecValueData] = data
-            item[kSecAttrLabel] = "蓝匣 · DeepSeek"
+            item[kSecAttrLabel] = "羽 · DeepSeek"
             try Self.checkKeychain(SecItemAdd(item as CFDictionary, nil))
         } else { try Self.checkKeychain(updated) }
 

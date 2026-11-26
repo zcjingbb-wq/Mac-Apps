@@ -13,7 +13,7 @@ enum HarnessError: LocalizedError, Equatable {
         case .keychainError: return "无法访问 macOS 钥匙串，请检查登录钥匙串后重试。"
         case .rejectedKey: return "DeepSeek 拒绝了此 API Key，请在偏好设置中更新。"
         case .insufficientBalance: return "DeepSeek API 账户余额不足，请检查账户余额。"
-        case .missingRuntime: return "未找到随蓝匣安装的 DeepSeek Harness 运行组件。"
+        case .missingRuntime: return "未找到随羽安装的 DeepSeek Harness 运行组件。"
         case .launchFailed: return "无法启动 DeepSeek Harness。"
         case .interrupted: return "DeepSeek Harness 提前退出，请重试。"
         case .protocolError: return "DeepSeek Harness 返回了无效的运行状态。"

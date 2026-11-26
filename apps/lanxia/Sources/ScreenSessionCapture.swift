@@ -32,7 +32,7 @@ enum ScreenSessionFailure: Error, LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .cancelled: return "已取消系统屏幕选择。"
-        case .permissionDenied: return "请在系统设置 → 隐私与安全性 → 屏幕与系统音频录制中允许蓝匣，必要时退出后重开，再主动选择内容。"
+        case .permissionDenied: return "请在系统设置 → 隐私与安全性 → 屏幕与系统音频录制中允许羽，必要时退出后重开，再主动选择内容。"
         case .unavailable: return "屏幕共享已结束，或所选窗口已关闭。再次观察需要重新选择。"
         case .invalidContent: return "所选画面无效或过大，请选择其他窗口。"
         case .storageFailed: return "临时画面未能保存，请检查可用空间和文件夹权限。"
