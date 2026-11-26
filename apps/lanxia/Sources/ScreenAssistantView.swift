@@ -23,7 +23,7 @@ struct ScreenAssistantView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
-                    Button(action: onBack) { Image(systemName: "chevron.left") }
+                    DwellButton(target: "返回初始页", action: onBack) { Image(systemName: "chevron.left") }
                         .buttonStyle(.plain).help("返回初始页").accessibilityLabel("返回初始页")
                     Label("屏幕助手", systemImage: "viewfinder")
                         .font(.system(size: 14, weight: .semibold))
@@ -73,7 +73,9 @@ struct ScreenAssistantView: View {
                         Label { Text(error).textSelection(.enabled) } icon: {
                             Image(systemName: "exclamationmark.circle")
                         }.foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
-                        Button("打开屏幕录制设置") { capture.openPrivacySettings() }
+                        DwellButton(target: "打开屏幕录制设置", action: capture.openPrivacySettings) {
+                            Text("打开屏幕录制设置")
+                        }
                     }.font(.system(size: 10)).padding(11)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .stashGlassSurface(cornerRadius: 12)

@@ -28,7 +28,7 @@ struct ScreenSessionView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
-                    Button(action: onBack) { Image(systemName: "chevron.left") }
+                    DwellButton(target: "返回初始页", action: onBack) { Image(systemName: "chevron.left") }
                         .buttonStyle(.plain).help("返回初始页").accessibilityLabel("返回初始页")
                     Label("屏幕助手", systemImage: "viewfinder")
                         .font(.system(size: 14, weight: .semibold))

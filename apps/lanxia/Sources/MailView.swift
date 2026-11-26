@@ -46,13 +46,19 @@ struct MailView: View {
     private var toolbar: some View {
         HStack(spacing: 8) {
             if selectedID != nil {
-                Button { selectedID = nil } label: { Label("邮件", systemImage: "chevron.left") }
+                DwellButton(target: "返回邮件列表", action: { selectedID = nil }) {
+                    Label("邮件", systemImage: "chevron.left")
+                }
                     .buttonStyle(.plain).font(.system(size: 11))
             } else {
-                Picker("显示", selection: $showOverview) {
-                    Text("总览").tag(true)
-                    Text("邮件").tag(false)
-                }.pickerStyle(.segmented).frame(width: 125)
+                HStack(spacing: 3) {
+                    mailMode("总览", overview: true)
+                    mailMode("邮件", overview: false)
+                }
+                .padding(3).frame(width: 125)
+                .stashGlassSurface(cornerRadius: 8)
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("显示")
             }
             Spacer(minLength: 3)
             if store.isSyncing { ProgressView().controlSize(.small).frame(width: 14) }
@@ -61,15 +67,37 @@ struct MailView: View {
             } label: { Image(systemName: "arrow.clockwise") }
                 .disabled(store.isSyncing).help("通过已连接的 Microsoft Outlook 刷新邮件")
                 .accessibilityLabel("刷新 Outlook 邮件")
-            Menu {
-                Button("重新读取本地快照") { store.reloadSnapshot() }
-                Button("导入邮件快照…") { importSnapshot() }
-                Button("处理关键词…") { ruleText = store.actionKeywords.joined(separator: "，"); showRules = true }
-                Button("打开 Outlook") { OutlookBridge.openOutlook() }
+            DwellMenu(target: "Outlook 选项") { dismiss in
+                DwellButton(target: "重新读取本地快照", action: {
+                    dismiss()
+                    store.reloadSnapshot()
+                }) { Text("重新读取本地快照") }
+                DwellButton(target: "选择邮件快照", action: {
+                    dismiss()
+                    importSnapshot()
+                }) { Text("导入邮件快照…") }
+                DwellButton(target: "打开处理关键词设置", action: {
+                    dismiss()
+                    ruleText = store.actionKeywords.joined(separator: "，")
+                    showRules = true
+                }) { Text("处理关键词…") }
+                Button("打开 Outlook") { dismiss(); OutlookBridge.openOutlook() }
             } label: { Image(systemName: "ellipsis.circle") }
-                .menuStyle(.borderlessButton).frame(width: 20).help("Outlook 选项")
+                .frame(width: 20).help("Outlook 选项").accessibilityLabel("Outlook 选项")
         }
         .buttonStyle(.borderless).padding(.horizontal, 14).padding(.vertical, 9)
+    }
+
+    private func mailMode(_ title: String, overview: Bool) -> some View {
+        let selected = showOverview == overview
+        return DwellButton(target: title, allowsDwell: !selected, action: { showOverview = overview }) {
+            Text(title)
+                .font(.system(size: 10, weight: selected ? .semibold : .regular))
+                .frame(maxWidth: .infinity).padding(.vertical, 4)
+                .background(.primary.opacity(selected ? 0.12 : 0), in: RoundedRectangle(cornerRadius: 5))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private var connectionSummary: some View {
@@ -110,9 +138,9 @@ struct MailView: View {
                 let counts = Dictionary(grouping: store.messages) { store.analysis(for: $0).category }
                 ForEach(MailCategory.allCases) { category in
                     if let count = counts[category]?.count {
-                        Button {
+                        DwellButton(target: "浏览\(category.title)邮件", action: {
                             filter = MailFilter(category: category); showOverview = false
-                        } label: {
+                        }) {
                             HStack {
                                 Label(category.title, systemImage: category.symbol)
                                 Spacer()
@@ -129,7 +157,7 @@ struct MailView: View {
                     Text("只提取明确日期，可能是活动日期或引用内容；添加提醒前请确认。")
                         .font(.system(size: 9)).foregroundStyle(.secondary)
                     ForEach(Array(upcoming.prefix(4))) { item in
-                        Button { selectedID = item.id } label: {
+                        DwellButton(target: "查看时间线索邮件", action: { selectedID = item.id }) {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(item.displaySubject).lineLimit(2)
                                 if let date = store.analysis(for: item).dateHint {
@@ -144,7 +172,7 @@ struct MailView: View {
     }
 
     private func metric(_ title: String, count: Int, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        DwellButton(target: "浏览\(title)邮件", action: action) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(count)").font(.system(size: 22, weight: .bold, design: .rounded))
                     .monospacedDigit().stashHighlightedText()
@@ -182,7 +210,8 @@ struct MailView: View {
                 Text("\(results.count) 封").font(.system(size: 10)).foregroundStyle(.secondary)
                 Spacer()
                 if filter != MailFilter() {
-                    Button("重置筛选") { filter = MailFilter() }.font(.system(size: 10)).buttonStyle(.plain)
+                    DwellButton(target: "重置邮件筛选", action: { filter = MailFilter() }) { Text("重置筛选") }
+                        .font(.system(size: 10)).buttonStyle(.plain)
                 }
             }
             LazyVStack(spacing: 7) {
@@ -194,7 +223,7 @@ struct MailView: View {
 
     private func messageRow(_ item: MailItem) -> some View {
         let analysis = store.analysis(for: item)
-        return Button { selectedID = item.id } label: {
+        return DwellButton(target: "查看邮件", action: { selectedID = item.id }) {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Circle().fill(item.isRead ? .clear : .primary).frame(width: 5, height: 5)
@@ -239,16 +268,18 @@ struct MailView: View {
                     .stashGlassSurface(cornerRadius: 13)
                 HStack(spacing: 9) {
                     if onCreateReminder != nil {
-                        Button { onCreateReminder?(item) } label: { Label("设为提醒", systemImage: "bell.badge") }
+                        DwellButton(target: "打开邮件提醒表单", action: { onCreateReminder?(item) }) {
+                            Label("设为提醒", systemImage: "bell.badge")
+                        }
                     }
                     if let url = item.safeWebURL {
                         Button { NSWorkspace.shared.open(url) } label: { Label("原邮件", systemImage: "arrow.up.right.square") }
                     }
                 }.font(.system(size: 10)).buttonStyle(.bordered)
                 if onAnalyze != nil {
-                    Button {
+                    DwellButton(target: "确认使用 AI 总结邮件", action: {
                         pendingAnalysis = item; confirmOnlineSummary = true
-                    } label: { Label("用当前 AI 总结", systemImage: "sparkles") }
+                    }) { Label("用当前 AI 总结", systemImage: "sparkles") }
                         .font(.system(size: 11)).buttonStyle(.bordered)
                     Text(analysisDisclosure).font(.system(size: 9)).foregroundStyle(.secondary)
                 }
@@ -281,7 +312,7 @@ struct MailView: View {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]; panel.canChooseDirectories = false; panel.allowsMultipleSelection = false
         panel.message = "选择 Outlook 邮件快照（outlook-mailbox.json）"
-        panel.begin { response in
+        panel.beginInLanxia { response in
             if response == .OK, let url = panel.url { store.importSnapshot(from: url) }
         }
     }

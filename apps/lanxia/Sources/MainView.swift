@@ -13,34 +13,13 @@ enum CatTheme {
 struct MenuShelfView: View {
     @ObservedObject var shelf: ShelfStore
     @ObservedObject var chat: ChatCoordinator
-    @ObservedObject var reminders: ReminderStore
     @ObservedObject var screenSession: ScreenSessionAssistant
     let onActivateAI: () -> Void
     let onDisableAI: () -> Void
-    let onOpen: (CompanionPage) -> Void
-    let onSettings: () -> Void
+    let onOpenChat: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Image(nsImage: StatusBarIcon.image())
-                    .accessibilityHidden(true)
-                Text("蓝匣")
-                    .font(.system(size: 17, weight: .bold))
-                    .stashHighlightedText()
-                Spacer()
-                Button(action: onSettings) {
-                    Image(systemName: "slider.horizontal.3")
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("偏好设置")
-                .help("偏好设置")
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 14)
-            .padding(.bottom, 10)
-
             HStack(spacing: 10) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 14, weight: .semibold))
@@ -56,7 +35,7 @@ struct MenuShelfView: View {
                 Spacer()
                 if chat.isEnabled {
                     Button("关闭 AI", action: onDisableAI)
-                    Button("打开聊天") { onOpen(.chat) }
+                    DwellButton(target: "打开聊天", action: onOpenChat) { Text("打开聊天") }
                         .stashGlassPrimaryButton()
                 } else {
                     Button("开启 AI", action: onActivateAI)
@@ -67,6 +46,7 @@ struct MenuShelfView: View {
             .padding(10)
             .stashGlassSurface(cornerRadius: 15, emphasis: true)
             .padding(.horizontal, 16)
+            .padding(.top, 10)
 
             if screenSession.capture.isRunning || screenSession.capture.isSelecting || screenSession.capture.isStopping {
                 HStack {
@@ -81,24 +61,13 @@ struct MenuShelfView: View {
 
             ShelfView(store: shelf)
 
-            Divider().opacity(0.38).padding(.horizontal, 16)
-            HStack(spacing: 20) {
-                Button { onOpen(.image) } label: { Label("识图", systemImage: "photo.viewfinder") }
-                Button { onOpen(.reminders) } label: {
-                    Label(reminders.dueCount > 0 ? "日程 · \(reminders.dueCount) 项到期" : "日程", systemImage: "calendar")
-                }
-                Button { onOpen(.mail) } label: { Label("Outlook 邮件", systemImage: "envelope") }
-                Spacer()
-                Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }
-                    .accessibilityLabel("退出蓝匣").help("退出蓝匣")
-            }
-            .font(.system(size: 11, weight: .medium))
-            .buttonStyle(.plain)
-            .padding(.vertical, 12)
-            .padding(.horizontal, 18)
+            Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }
+                .buttonStyle(.plain).font(.system(size: 11))
+                .accessibilityLabel("退出蓝匣").help("退出蓝匣")
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 8)
         }
-        .frame(width: 420, height: 530)
-        .tint(CatTheme.teal)
     }
 }
 
@@ -106,11 +75,17 @@ struct SettingsView: View {
     @ObservedObject var voiceInput: VoiceInputService
     let isAIEnabled: Bool
     @AppStorage("voiceAllowNetworkRecognition") private var voiceAllowNetworkRecognition = false
+    @AppStorage("dwellToOpenEnabled") private var dwellToOpenEnabled = true
     @State private var loginEnabled = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            settingsCard("操作方式", icon: "cursorarrow") {
+                Toggle("悬停 2 秒打开", isOn: $dwellToOpenEnabled)
+                Text("停在功能键上可预览目标，进度条走完后打开。移开指针或滚动可取消。")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+            }
             if isAIEnabled {
                 settingsCard("语音输入", icon: "waveform") {
                     Text("点击聊天输入框里的麦克风录音。识别后可先编辑，再点发送。")
@@ -131,14 +106,14 @@ struct SettingsView: View {
                     }
                 }
                 if let loginError { Text(loginError).font(.caption).foregroundStyle(.orange) }
-                Button("打开应用数据文件夹") {
+                DwellButton(target: "打开应用数据文件夹", action: {
                     let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
                     NSWorkspace.shared.open(support.appendingPathComponent("StashCat"))
-                }
+                }) { Text("打开应用数据文件夹") }
                 Text("暂存站保存文件副本。移除暂存项时，副本会移到废纸篓。")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
             }
-            Text("蓝匣 \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.1.0")")
+            Text("蓝匣 \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.2.0")")
                 .font(.system(size: 10)).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity).padding(.vertical, 5)
         }

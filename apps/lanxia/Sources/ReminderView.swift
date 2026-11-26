@@ -19,7 +19,9 @@ struct ReminderView: View {
                         Image(systemName: "exclamationmark.circle")
                         Text(error).textSelection(.enabled)
                         Spacer(minLength: 0)
-                        Button { formError = nil; store.errorMessage = nil } label: { Image(systemName: "xmark") }
+                        DwellButton(target: "关闭日程提示", action: { formError = nil; store.errorMessage = nil }) {
+                            Image(systemName: "xmark")
+                        }
                             .buttonStyle(.plain).accessibilityLabel("关闭日程提示")
                     }.font(.system(size: 10)).padding(10)
                         .background(.primary.opacity(0.065), in: RoundedRectangle(cornerRadius: 10))
@@ -30,6 +32,7 @@ struct ReminderView: View {
                     Label("添加提醒", systemImage: "plus.circle").font(.system(size: 13, weight: .semibold))
                         .stashHighlightedText()
                 }
+                .disclosureGroupStyle(DwellDisclosureStyle(target: "添加提醒表单"))
                 Divider().opacity(0.5)
                 HStack {
                     Text("待办").font(.system(size: 12, weight: .semibold)).stashHighlightedText()
@@ -55,6 +58,7 @@ struct ReminderView: View {
                     } label: {
                         Text("已完成（\(store.completed.count)）").font(.system(size: 11)).foregroundStyle(.secondary)
                     }
+                    .disclosureGroupStyle(DwellDisclosureStyle(target: "已完成提醒"))
                 }
                 Text("菜单栏首页会显示到期事项数量。系统通知需授权；休眠、专注模式或系统设置可能延后提示。每日／每周按创建时的时区重复。")
                     .font(.system(size: 9)).foregroundStyle(.secondary).lineSpacing(3)
@@ -80,14 +84,20 @@ struct ReminderView: View {
                     }.font(.system(size: 10, weight: .medium))
                         .disabled(store.isRequestingAuthorization)
                     if store.isRequestingAuthorization {
-                        Button("通知设置") { store.openSystemNotificationSettings() }
+                        DwellButton(target: "打开通知设置", action: store.openSystemNotificationSettings) {
+                            Text("通知设置")
+                        }
                             .font(.system(size: 10))
                     }
                 } else if store.authorization.status == .denied || (store.authorization.canSchedule && !store.authorization.alertsEnabled) {
-                    Button("打开通知设置") { store.openSystemNotificationSettings() }
+                    DwellButton(target: "打开通知设置", action: store.openSystemNotificationSettings) {
+                        Text("打开通知设置")
+                    }
                         .font(.system(size: 10, weight: .medium))
                 }
-                Button("刷新状态") { Task { await store.refreshAuthorization() } }
+                DwellButton(target: "刷新通知状态", action: { Task { await store.refreshAuthorization() } }) {
+                    Text("刷新状态")
+                }
                     .font(.system(size: 10)).buttonStyle(.plain).foregroundStyle(.secondary)
                 Spacer(minLength: 0)
             }
@@ -206,6 +216,27 @@ struct ReminderView: View {
                 notes = ""
                 showCreate = false
             } catch { formError = error.localizedDescription }
+        }
+    }
+}
+
+private struct DwellDisclosureStyle: DisclosureGroupStyle {
+    let target: String
+
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            DwellButton(target: target, action: { configuration.isExpanded.toggle() }) {
+                HStack(spacing: 6) {
+                    Image(systemName: configuration.isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    configuration.label
+                    Spacer(minLength: 0)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(configuration.isExpanded ? "已展开" : "已收起")
+            if configuration.isExpanded { configuration.content }
         }
     }
 }

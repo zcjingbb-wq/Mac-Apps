@@ -10,7 +10,7 @@ struct AttachmentTrayView: View {
         VStack(spacing: 5) {
             ForEach(store.items) { item in
                 HStack(spacing: 7) {
-                    Button { selected = item } label: {
+                    DwellButton(target: "预览附件 \(item.name)", action: { selected = item }) {
                         HStack(spacing: 7) {
                             if let url = item.imageURL, let image = NSImage(contentsOf: url) {
                                 Image(nsImage: image).resizable().scaledToFit().frame(width: 26, height: 26)
@@ -35,7 +35,8 @@ struct AttachmentTrayView: View {
                     Text(item.name).font(.system(size: 13, weight: .semibold)).lineLimit(2)
                         .stashHighlightedText()
                     Spacer()
-                    Button("关闭") { selected = nil }.font(.system(size: 11))
+                    DwellButton(target: "关闭附件预览", action: { selected = nil }) { Text("关闭") }
+                        .font(.system(size: 11))
                 }
                 Text(item.notice ?? "已读取文件内容").font(.system(size: 10)).foregroundStyle(.secondary)
                 ScrollView {

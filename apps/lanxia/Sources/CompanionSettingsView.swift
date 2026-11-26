@@ -4,33 +4,14 @@ struct CompanionSettingsView: View {
     @ObservedObject var chat: ChatCoordinator
     @ObservedObject var voiceInput: VoiceInputService
     let onDisableAI: () -> Void
-    let onBack: () -> Void
-    let onClose: () -> Void
     @State private var apiKey = ""
     @State private var keyMessage: String?
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Button(action: onBack) {
-                    Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold))
-                        .frame(width: 28, height: 28).stashGlassSurface(cornerRadius: 14)
-                }.help("回到初始页")
-                Text("偏好设置").font(.system(size: 16, weight: .bold, design: .rounded))
-                    .stashHighlightedText()
-                Spacer()
-                Button(action: onClose) {
-                    Image(systemName: "xmark").font(.system(size: 10, weight: .semibold))
-                        .frame(width: 28, height: 28).stashGlassSurface(cornerRadius: 14)
-                }.help("收起面板")
-            }.buttonStyle(.plain).padding(.horizontal, 16).padding(.vertical, 10)
-            Divider().opacity(0.3).padding(.horizontal, 16)
-            ScrollView {
-                if chat.isEnabled { providerSettings }
-                SettingsView(voiceInput: voiceInput, isAIEnabled: chat.isEnabled)
-            }
-        }.stashGlassPanelEdge()
-            .tint(CatTheme.teal)
+        ScrollView {
+            if chat.isEnabled { providerSettings }
+            SettingsView(voiceInput: voiceInput, isAIEnabled: chat.isEnabled)
+        }
     }
 
     private var providerSettings: some View {

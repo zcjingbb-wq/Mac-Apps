@@ -30,12 +30,18 @@ struct ShelfView: View {
                         .font(.system(size: 12)).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 8)
-                Menu {
-                    Button("选择文件或文件夹…", systemImage: "folder.badge.plus") {
+                DwellMenu(target: "压缩文件为 ZIP") { dismiss in
+                    DwellButton(target: "选择要压缩的文件", action: {
+                        dismiss()
                         chooseCompressionSources()
+                    }) {
+                        Label("选择文件或文件夹…", systemImage: "folder.badge.plus")
                     }
-                    Button("压缩全部暂存项…", systemImage: "archivebox") {
+                    DwellButton(target: "选择全部暂存项的压缩位置", action: {
+                        dismiss()
                         chooseArchiveDestination(for: store.items.map { store.url(for: $0) })
+                    }) {
+                        Label("压缩全部暂存项…", systemImage: "archivebox")
                     }
                     .disabled(store.items.isEmpty)
                 } label: {
@@ -43,12 +49,12 @@ struct ShelfView: View {
                         .font(.system(size: 13, weight: .semibold))
                         .frame(width: 25, height: 25)
                 }
-                .menuStyle(.borderlessButton)
+                .buttonStyle(.plain)
                 .fixedSize()
                 .help("将文件或文件夹压缩为 ZIP")
                 .accessibilityLabel("压缩文件为 ZIP")
                 .disabled(fileActionsUnavailable)
-                Button { store.importWithPanel() } label: {
+                DwellButton(target: "添加暂存文件", action: store.importWithPanel) {
                     Label("添加", systemImage: "plus").font(.system(size: 12, weight: .semibold))
                 }
                 .stashGlassPrimaryButton()
@@ -59,7 +65,9 @@ struct ShelfView: View {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 TextField("查找暂存文件", text: $query).textFieldStyle(.plain)
                 if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary) }
+                    DwellButton(target: "清空文件搜索", action: { query = "" }) {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
+                    }
                         .buttonStyle(.plain).help("清空搜索")
                 }
             }
@@ -140,7 +148,7 @@ struct ShelfView: View {
                     .fontWeight(.semibold).monospacedDigit().stashHighlightedText()
                 Spacer()
                 if !store.items.isEmpty {
-                    Button("清空暂存") { confirmClear = true }
+                    DwellButton(target: "清空暂存", action: { confirmClear = true }) { Text("清空暂存") }
                         .buttonStyle(.plain).foregroundStyle(.secondary)
                         .disabled(fileActionsUnavailable)
                 }
@@ -177,7 +185,7 @@ struct ShelfView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .accessibilityLabel("取消文件压缩")
                 } else {
-                    Button { compressor.clearFeedback() } label: {
+                    DwellButton(target: "关闭压缩结果", action: compressor.clearFeedback) {
                         Image(systemName: "xmark").font(.system(size: 10, weight: .semibold))
                     }
                     .buttonStyle(.plain)
@@ -189,8 +197,10 @@ struct ShelfView: View {
                     .font(.system(size: 10)).foregroundStyle(.secondary)
                     .lineLimit(1).truncationMode(.middle)
                 HStack(spacing: 14) {
-                    Button("在访达中显示", systemImage: "folder") {
+                    DwellButton(target: "在访达中显示 ZIP 压缩包", action: {
                         NSWorkspace.shared.activateFileViewerSelecting([output])
+                    }) {
+                        Label("在访达中显示", systemImage: "folder")
                     }
                     .accessibilityLabel("在访达中显示 ZIP 压缩包")
                     Button("加入暂存站", systemImage: "tray.and.arrow.down") {
@@ -218,20 +228,14 @@ struct ShelfView: View {
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
-        panel.level = .modalPanel
-        NSApp.activate()
-        panel.begin { response in
+        panel.beginInLanxia { response in
             Task { @MainActor in
                 isChoosingArchive = false
                 if response == .OK {
                     chooseArchiveDestination(for: panel.urls)
-                } else {
-                    revealAfterArchivePicker()
                 }
             }
         }
-        panel.makeKeyAndOrderFront(nil)
-        DispatchQueue.main.async { panel.makeKeyAndOrderFront(nil) }
     }
 
     private func chooseArchiveDestination(for urls: [URL]) {
@@ -247,25 +251,14 @@ struct ShelfView: View {
         panel.canCreateDirectories = true
         panel.isExtensionHidden = false
         panel.nameFieldStringValue = urls.count == 1 ? "\(urls[0].lastPathComponent).zip" : "暂存文件.zip"
-        panel.level = .modalPanel
-        NSApp.activate()
-        panel.begin { response in
+        panel.beginInLanxia { response in
             Task { @MainActor in
                 isChoosingArchive = false
-                guard response == .OK, let destination = panel.url else {
-                    revealAfterArchivePicker()
-                    return
-                }
+                guard response == .OK, let destination = panel.url else { return }
                 NotificationCenter.default.post(name: .init("StashCatShowCompression"), object: nil)
                 await compressor.compress(urls: urls, destination: destination)
             }
         }
-        panel.makeKeyAndOrderFront(nil)
-        DispatchQueue.main.async { panel.makeKeyAndOrderFront(nil) }
-    }
-
-    private func revealAfterArchivePicker() {
-        NotificationCenter.default.post(name: .init("StashCatRevealCompanion"), object: nil)
     }
 
     private var totalSize: String {
@@ -320,17 +313,17 @@ private struct ShelfItemRow: View {
                     .font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 0)
-            Button(action: onCompress) {
+            DwellButton(target: "压缩「\(item.name)」为 ZIP", action: onCompress) {
                 Image(systemName: "archivebox").font(.system(size: 12))
             }
             .buttonStyle(.plain).foregroundStyle(.secondary).help("压缩为 ZIP")
             .accessibilityLabel("压缩「\(item.name)」为 ZIP")
             .disabled(fileActionsUnavailable)
-            Button { store.copy(item) } label: {
+            DwellButton(target: "复制文件「\(item.name)」", action: { store.copy(item) }) {
                 Image(systemName: "doc.on.doc").font(.system(size: 12))
             }
             .buttonStyle(.plain).foregroundStyle(.secondary).help("复制文件，随后可粘贴")
-            Button { store.reveal(item) } label: {
+            DwellButton(target: "在访达中显示「\(item.name)」", action: { store.reveal(item) }) {
                 Image(systemName: "arrow.up.right.square").font(.system(size: 12))
             }
             .buttonStyle(.plain).foregroundStyle(.secondary).help("在访达中显示")

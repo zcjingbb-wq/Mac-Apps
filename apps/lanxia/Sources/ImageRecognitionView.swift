@@ -25,9 +25,11 @@ struct ImageRecognitionView: View {
                         .font(.system(size: 19, weight: .bold)).stashHighlightedText()
                     Spacer(minLength: 0)
                     Button("粘贴图片", systemImage: "clipboard", action: pasteImage).disabled(busy)
-                    Button(item == nil ? "选择图片" : "更换图片", systemImage: "photo", action: chooseImage)
-                        .stashGlassPrimaryButton()
-                        .disabled(busy)
+                    DwellButton(target: item == nil ? "选择图片" : "更换图片", action: chooseImage) {
+                        Label(item == nil ? "选择图片" : "更换图片", systemImage: "photo")
+                    }
+                    .stashGlassPrimaryButton()
+                    .disabled(busy)
                 }
                 .controlSize(.small)
                 preview
@@ -106,9 +108,11 @@ struct ImageRecognitionView: View {
                 Text("识别文字").font(.system(size: 13, weight: .semibold))
                 Spacer()
                 if !result.recognizedText.isEmpty {
-                    Button(copiedText ? "已复制" : "复制文字", systemImage: "doc.on.doc") {
+                    DwellButton(target: "复制识别文字", action: {
                         NSPasteboard.general.clearContents()
                         copiedText = NSPasteboard.general.setString(result.recognizedText, forType: .string)
+                    }) {
+                        Label(copiedText ? "已复制" : "复制文字", systemImage: "doc.on.doc")
                     }.controlSize(.small)
                 }
             }
@@ -158,10 +162,8 @@ struct ImageRecognitionView: View {
         panel.allowedContentTypes = [.image]
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        NSApp.activate()
-        panel.begin { response in
+        panel.beginInLanxia { response in
             choosingImage = false
-            NotificationCenter.default.post(name: .init("StashCatRevealCompanion"), object: nil)
             if response == .OK, let url = panel.url { importImage(url) }
         }
     }

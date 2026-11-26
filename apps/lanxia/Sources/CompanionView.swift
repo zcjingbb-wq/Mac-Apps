@@ -12,10 +12,15 @@ struct CompanionView: View {
     @ObservedObject var voiceInput: VoiceInputService
     @ObservedObject var screenSession: ScreenSessionAssistant
     let onClose: () -> Void
-    let onHome: () -> Void
-    let onSettings: () -> Void
+    let onToggleExpanded: () -> Void
+    let onActivateAI: () -> Void
+    let onDisableAI: () -> Void
     let onMailReminder: (MailItem) -> Void
     let onMailAnalyze: (MailItem) -> Void
+    @AppStorage("dwellToOpenEnabled") private var dwellToOpenEnabled = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @StateObject private var dwellPreview = DwellPreview()
+    @Namespace private var tabSelection
 
     private var page: CompanionPage {
         get { navigation.page }
@@ -35,65 +40,43 @@ struct CompanionView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            if chat.isEnabled { providerBar }
             Divider().opacity(0.22).padding(.horizontal, 16)
-            Group {
-                switch page {
-                case .chat: conversation
-                case .image:
-                    ImageRecognitionView(store: recognizedImage, chat: chat, isSending: isSendingImageQuestion,
-                                         onAnalyze: analyzeRecognizedImage)
-                case .screen:
-                    VStack(spacing: 0) {
-                        Picker("屏幕读取方式", selection: $screenMode) {
-                            Text("持续会话").tag("session")
-                            Text("单次截图").tag("single")
-                        }.pickerStyle(.segmented).labelsHidden().padding(.horizontal, 14).padding(.top, 10)
-                        if screenMode == "session" {
-                            ScreenSessionView(assistant: screenSession, chat: chat, onBack: { page = .chat })
-                        } else {
-                            if screenSession.capture.isRunning || screenSession.capture.isSelecting || screenSession.capture.isStopping {
-                                HStack {
-                                    Text("持续会话正在使用屏幕共享，停止后可单次截图。")
-                                        .font(.system(size: 10)).foregroundStyle(.secondary)
-                                    Button("停止持续会话") { screenSession.stop() }.font(.system(size: 10))
-                                }.padding(.horizontal, 14).padding(.top, 8)
-                            }
-                            ScreenAssistantView(capture: screenCapture, provider: chat.provider,
-                                                isBusy: chat.isGenerating || screenQuestion.isPreparing || chat.authRequired || screenSession.capture.isRunning || screenSession.capture.isSelecting || screenSession.capture.isStopping,
-                                                onUseCapture: analyzeScreen, onBack: { page = .chat })
-                                .overlay(alignment: .bottom) {
-                                    if let error = screenQuestion.errorMessage {
-                                        Text(error).font(.system(size: 10)).foregroundStyle(.orange)
-                                            .padding(10).stashGlassSurface(cornerRadius: 10).padding(12)
-                                    }
-                                }
-                        }
+            ZStack {
+                VStack(spacing: 0) {
+                    if chat.isEnabled, page != .home, page != .settings { providerBar.padding(.top, 7) }
+                    pageContent
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if page == .screen && chat.authRequired { connectionNotice }
+                    if page == .chat && chat.isEnabled {
+                        connectionNotice
+                        composer
                     }
-                case .files:
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            if chat.isEnabled { fileAccessActions }
-                            ShelfView(store: shelf, onAnalyze: chat.isEnabled ? { url in addAttachments([url]) } : nil).frame(minHeight: 385)
-                        }
-                    }
-                case .reminders: ReminderView(store: reminders)
-                case .mail:
-                    MailView(store: mail, onCreateReminder: onMailReminder,
-                             onAnalyze: chat.isEnabled && !chat.authRequired && !chat.isGenerating ? onMailAnalyze : nil,
-                             analysisDisclosure: "会将选中邮件的前 4200 字及主题、发件人和日期发送至 \(chat.provider.destinationName)。")
                 }
+                .id(page)
+                .transition(pageTransition)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            if page == .screen && chat.authRequired { connectionNotice }
-            if page == .chat && chat.isEnabled {
-                connectionNotice
-                composer
-            }
+            .clipped()
             tabBar
         }
+        .environment(\.dwellPreview, dwellPreview)
+        .overlay(alignment: .top) {
+            if let target = dwellPreview.target {
+                Label("即将打开 · \(target)", systemImage: "cursorarrow.motionlines")
+                    .font(.system(size: 11, weight: .semibold))
+                    .padding(.horizontal, 11).padding(.vertical, 6)
+                    .background(.regularMaterial, in: Capsule())
+                    .overlay(Capsule().strokeBorder(.primary.opacity(0.2), lineWidth: 0.75))
+                    .padding(.top, 37)
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.94).combined(with: .opacity))
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.16), value: dwellPreview.target)
+        .animation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.86), value: page)
         .stashGlassPanelEdge()
         .tint(CatTheme.teal)
+        .environment(\.dwellToOpenEnabled, dwellToOpenEnabled)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             attachments.clear(); recognizedImage.clear(); screenCapture.cancel(); screenQuestion.cancel()
         }
@@ -133,15 +116,87 @@ struct CompanionView: View {
         }
     }
 
+    private var pageTransition: AnyTransition {
+        if reduceMotion { return .identity }
+        return .asymmetric(
+            insertion: .offset(x: 20).combined(with: .scale(scale: 0.985)).combined(with: .opacity),
+            removal: .offset(x: -12).combined(with: .opacity)
+        )
+    }
+
+    @ViewBuilder private var pageContent: some View {
+        switch page {
+        case .home:
+            MenuShelfView(shelf: shelf, chat: chat, screenSession: screenSession,
+                          onActivateAI: onActivateAI, onDisableAI: onDisableAI,
+                          onOpenChat: { page = .chat })
+        case .settings:
+            CompanionSettingsView(chat: chat, voiceInput: voiceInput, onDisableAI: onDisableAI)
+        case .chat: conversation
+        case .image:
+            ImageRecognitionView(store: recognizedImage, chat: chat, isSending: isSendingImageQuestion,
+                                 onAnalyze: analyzeRecognizedImage)
+        case .screen:
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    screenModeButton("持续会话", mode: "session")
+                    screenModeButton("单次截图", mode: "single")
+                }.padding(.horizontal, 14).padding(.top, 10)
+                if screenMode == "session" {
+                    ScreenSessionView(assistant: screenSession, chat: chat, onBack: { page = .chat })
+                } else {
+                    if screenSession.capture.isRunning || screenSession.capture.isSelecting || screenSession.capture.isStopping {
+                        HStack {
+                            Text("持续会话正在使用屏幕共享，停止后可单次截图。")
+                                .font(.system(size: 10)).foregroundStyle(.secondary)
+                            Button("停止持续会话") { screenSession.stop() }.font(.system(size: 10))
+                        }.padding(.horizontal, 14).padding(.top, 8)
+                    }
+                    ScreenAssistantView(capture: screenCapture, provider: chat.provider,
+                                        isBusy: chat.isGenerating || screenQuestion.isPreparing || chat.authRequired || screenSession.capture.isRunning || screenSession.capture.isSelecting || screenSession.capture.isStopping,
+                                        onUseCapture: analyzeScreen, onBack: { page = .chat })
+                        .overlay(alignment: .bottom) {
+                            if let error = screenQuestion.errorMessage {
+                                Text(error).font(.system(size: 10)).foregroundStyle(.orange)
+                                    .padding(10).stashGlassSurface(cornerRadius: 10).padding(12)
+                            }
+                        }
+                }
+            }
+        case .files:
+            ScrollView {
+                VStack(spacing: 0) {
+                    if chat.isEnabled { fileAccessActions }
+                    ShelfView(store: shelf, onAnalyze: chat.isEnabled ? { url in addAttachments([url]) } : nil).frame(minHeight: 385)
+                }
+            }
+        case .reminders: ReminderView(store: reminders)
+        case .mail:
+            MailView(store: mail, onCreateReminder: onMailReminder,
+                     onAnalyze: chat.isEnabled && !chat.authRequired && !chat.isGenerating ? onMailAnalyze : nil,
+                     analysisDisclosure: "会将选中邮件的前 4200 字及主题、发件人和日期发送至 \(chat.provider.destinationName)。")
+        }
+    }
+
+    private func screenModeButton(_ title: String, mode: String) -> some View {
+        DwellButton(target: title, allowsDwell: screenMode != mode, action: { screenMode = mode }) {
+            Text(title).font(.system(size: 11)).padding(.horizontal, 10).padding(.vertical, 5)
+                .background(.primary.opacity(screenMode == mode ? 0.15 : 0.045), in: Capsule())
+        }.buttonStyle(.plain)
+            .accessibilityAddTraits(screenMode == mode ? .isSelected : [])
+    }
+
     private var header: some View {
         HStack(spacing: 9) {
-            Button(action: onHome) {
+            DwellButton(target: "首页", allowsDwell: page != .home, action: { page = .home }) {
                 Image(systemName: "chevron.left")
                     .frame(width: 27, height: 27)
                     .stashGlassSurface(cornerRadius: 9)
             }
             .help("回到菜单栏首页")
             .accessibilityLabel("回到菜单栏首页")
+            .disabled(page == .home)
+            Image(nsImage: StatusBarIcon.image()).accessibilityHidden(true)
             Text("蓝匣")
                 .font(.system(size: 15, weight: .bold, design: .rounded))
                 .stashHighlightedText()
@@ -156,11 +211,15 @@ struct CompanionView: View {
                     .help("屏幕会话进行中，点击停止").accessibilityLabel("停止屏幕会话")
             }
             if chat.isEnabled {
-                Button { page = .screen } label: { Image(systemName: "viewfinder") }
+                DwellButton(target: "屏幕助手", allowsDwell: page != .screen, action: { page = .screen }) { Image(systemName: "viewfinder") }
                     .help("选择屏幕内容，预览后向 AI 提问").accessibilityLabel("屏幕助手")
             }
-            Button(action: onSettings) { Image(systemName: "slider.horizontal.3") }
+            DwellButton(target: "偏好设置", allowsDwell: page != .settings, action: { page = .settings }) { Image(systemName: "slider.horizontal.3") }
                 .help("偏好设置").accessibilityLabel("偏好设置")
+            let sizeAction = navigation.isExpanded ? "恢复紧凑面板" : "展开主面板"
+            DwellButton(target: sizeAction, action: onToggleExpanded) {
+                Image(systemName: navigation.isExpanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+            }.help(sizeAction).accessibilityLabel(sizeAction)
             Button(action: onClose) { Image(systemName: "xmark") }
                 .help("收起面板").accessibilityLabel("收起面板")
         }
@@ -172,9 +231,10 @@ struct CompanionView: View {
 
     private var providerBar: some View {
         HStack(spacing: 5) {
-            Menu {
+            DwellMenu(target: "选择 AI 提供方") { dismiss in
                 ForEach(ChatProvider.allCases) { provider in
                     Button {
+                        dismiss()
                         chat.switchProvider(provider)
                     } label: {
                         if provider == chat.provider {
@@ -184,7 +244,7 @@ struct CompanionView: View {
                 }
                 if chat.provider == .codex {
                     Divider()
-                    Button("刷新 Codex 额度") { Task { await chat.codex.refreshUsage() } }
+                    Button("刷新 Codex 额度") { dismiss(); Task { await chat.codex.refreshUsage() } }
                 }
             } label: {
                 HStack(spacing: 6) {
@@ -197,7 +257,7 @@ struct CompanionView: View {
                 .padding(.horizontal, 10).padding(.vertical, 7)
                 .stashGlassSurface(cornerRadius: 18, emphasis: true)
             }
-            .menuStyle(.borderlessButton).fixedSize()
+            .buttonStyle(.plain).fixedSize()
             .help("在 DeepSeek Harness 与 OpenAI Codex 之间切换")
             .accessibilityLabel("\(chat.provider.displayName)，切换 AI")
             if chat.provider == .codex {
@@ -232,7 +292,8 @@ struct CompanionView: View {
                     .font(.system(size: 9)).foregroundStyle(.secondary).lineLimit(1)
                 Spacer(minLength: 4)
                 if !chat.messages.isEmpty {
-                    Button("清空") { confirmClear = true }.buttonStyle(.plain)
+                    DwellButton(target: "清空对话确认", action: { confirmClear = true }) { Text("清空") }
+                        .buttonStyle(.plain)
                         .font(.system(size: 10)).foregroundStyle(.secondary).disabled(chat.isGenerating)
                 }
             }.padding(.horizontal, 17).padding(.top, 10).padding(.bottom, 5)
@@ -276,7 +337,8 @@ struct CompanionView: View {
                 Text("在偏好设置中添加 DeepSeek API Key 后即可聊天。")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
                 Spacer()
-                Button("偏好设置", action: onSettings).controlSize(.small)
+                DwellButton(target: "偏好设置", action: { page = .settings }) { Text("偏好设置") }
+                    .controlSize(.small)
             }
             .padding(10).stashGlassSurface(cornerRadius: 12)
             .padding(.horizontal, 14).padding(.top, 5)
@@ -336,12 +398,12 @@ struct CompanionView: View {
                 }
             }
             HStack(alignment: .bottom, spacing: 8) {
-                Menu {
-                    Button("读取文件…") { chooseAttachments(imagesOnly: false) }
-                    Button("识别图片…") { chooseAttachments(imagesOnly: true) }
-                    Button("读取屏幕…") { page = .screen }
+                DwellMenu(target: "添加附件") { dismiss in
+                    DwellButton(target: "读取文件", action: { dismiss(); chooseAttachments(imagesOnly: false) }) { Text("读取文件…") }
+                    DwellButton(target: "识别图片", action: { dismiss(); chooseAttachments(imagesOnly: true) }) { Text("识别图片…") }
+                    DwellButton(target: "读取屏幕", action: { dismiss(); page = .screen }) { Text("读取屏幕…") }
                 } label: { Image(systemName: "paperclip").font(.system(size: 13)).frame(width: 22, height: 29) }
-                    .menuStyle(.borderlessButton).fixedSize().disabled(chat.isGenerating || attachments.isLoading || attachments.items.count >= 4 || voiceInputActive)
+                    .buttonStyle(.plain).fixedSize().disabled(chat.isGenerating || attachments.isLoading || attachments.items.count >= 4 || voiceInputActive)
                     .help("读取文件或识别图片").accessibilityLabel("添加文件或图片附件")
                 TextField(chat.authRequired ? "请先配置 \(chat.provider.destinationName)…" : "输入问题…", text: $input, axis: .vertical)
                     .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(.primary).lineLimit(1...4)
@@ -451,8 +513,8 @@ struct CompanionView: View {
 
     private var tabBar: some View {
         HStack(spacing: 5) {
-            ForEach(CompanionPage.allCases.filter { $0 != .screen && ($0 != .chat || chat.isEnabled) }) { tab in
-                Button { page = tab } label: {
+            ForEach(CompanionPage.allCases.filter { $0 != .screen && $0 != .settings && ($0 != .chat || chat.isEnabled) }) { tab in
+                DwellButton(target: tab.title, allowsDwell: page != tab, action: { page = tab }) {
                     VStack(spacing: 4) {
                         Image(systemName: tab.icon)
                             .font(.system(size: 13, weight: page == tab ? .semibold : .regular))
@@ -470,6 +532,7 @@ struct CompanionView: View {
                                         .strokeBorder(.primary.opacity(0.12), lineWidth: 0.6)
                                 }
                                 .shadow(color: .black.opacity(0.06), radius: 3, y: 1)
+                                .matchedGeometryEffect(id: "selectedTab", in: tabSelection)
                         }
                     }
                 }.buttonStyle(.plain)
@@ -508,8 +571,8 @@ struct CompanionView: View {
             Text("选择文件或图片，预览内容后向当前 AI 提问。")
                 .font(.system(size: 10)).foregroundStyle(.secondary)
             HStack(spacing: 9) {
-                Button { chooseAttachments(imagesOnly: false) } label: { Label("读取文件", systemImage: "doc.text.magnifyingglass") }
-                Button { page = .image } label: { Label("识图", systemImage: "photo.viewfinder") }
+                DwellButton(target: "读取文件", action: { chooseAttachments(imagesOnly: false) }) { Label("读取文件", systemImage: "doc.text.magnifyingglass") }
+                DwellButton(target: "识图", action: { page = .image }) { Label("识图", systemImage: "photo.viewfinder") }
             }.font(.system(size: 11)).disabled(chat.isGenerating || attachments.isLoading || attachments.items.count >= 4)
         }.padding(13).frame(maxWidth: .infinity, alignment: .leading)
             .stashGlassSurface(cornerRadius: 15)
@@ -525,9 +588,7 @@ struct CompanionView: View {
         panel.canChooseFiles = true
         panel.allowsMultipleSelection = true
         if imagesOnly { panel.allowedContentTypes = [.image] }
-        NSApp.activate()
-        panel.begin { result in
-            NotificationCenter.default.post(name: .init("StashCatRevealCompanion"), object: nil)
+        panel.beginInLanxia { result in
             guard result == .OK else { return }
             addAttachments(panel.urls)
         }
@@ -586,14 +647,17 @@ struct CompanionView: View {
 }
 
 @MainActor final class PanelNavigation: ObservableObject {
-    @Published var page: CompanionPage = .files
+    @Published var page: CompanionPage = .home
+    @Published var isExpanded = false
 }
 
 enum CompanionPage: String, CaseIterable, Identifiable {
-    case chat, files, image, reminders, mail, screen
+    case home, chat, files, image, reminders, mail, screen, settings
     var id: String { rawValue }
     var title: String {
         switch self {
+        case .home: "首页"
+        case .settings: "偏好设置"
         case .chat: "聊天"
         case .files: "文件"
         case .image: "识图"
@@ -604,6 +668,8 @@ enum CompanionPage: String, CaseIterable, Identifiable {
     }
     var icon: String {
         switch self {
+        case .home: "house"
+        case .settings: "slider.horizontal.3"
         case .chat: "bubble.left.and.bubble.right"
         case .files: "tray"
         case .image: "photo.viewfinder"

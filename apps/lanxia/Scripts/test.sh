@@ -8,6 +8,8 @@ if [[ -z "${STASHCAT_SDK_PATH:-}" && "$(xcode-select -p)" == /Library/Developer/
 fi
 TEST_DIR=$(mktemp -d /tmp/StashCat-tests.XXXXXX)
 trap 'rm -rf -- "$TEST_DIR"' EXIT
+xcrun swiftc -warnings-as-errors -parse-as-library -sdk "$TASK_SDK_PATH" -target arm64-apple-macos14.0 "$PROJECT_DIR/Sources/DwellActivation.swift" "$PROJECT_DIR/Tests/DwellActivationTests.swift" -o "$TEST_DIR/dwell"
+"$TEST_DIR/dwell"
 xcrun swiftc -warnings-as-errors -parse-as-library "$PROJECT_DIR/Sources/Calculus.swift" "$PROJECT_DIR/Tests/CalculusTests.swift" -o "$TEST_DIR/calculus"
 "$TEST_DIR/calculus"
 xcrun swiftc -warnings-as-errors -parse-as-library "$PROJECT_DIR/Sources/ShelfStore.swift" "$PROJECT_DIR/Tests/ShelfStoreTests.swift" -framework AppKit -o "$TEST_DIR/shelf"

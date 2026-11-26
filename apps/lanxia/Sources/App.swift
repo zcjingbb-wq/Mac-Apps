@@ -28,19 +28,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusDropTarget: StatusDropTarget?
     private lazy var chat = ChatCoordinator(deepseek: ai, codex: codex)
     private var statusItem: NSStatusItem!
-    private let popover = NSPopover()
     private var companionPanel: CompanionPanel!
-    private var companionHost: NSView!
-    private var settingsHost: NSView!
-    private var glassHost: GlassPanelHost!
     private let panelSize = NSSize(width: 420, height: 560)
     private var isWaitingForCompressionToQuit = false
+    private var dwellEventMonitor: Any?
     private var subscriptions = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenu()
         setupCompanionPanel()
         setupStatusItem()
+        dwellEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel]) { event in
+            NotificationCenter.default.post(name: .cancelDwellActivation, object: nil)
+            return event
+        }
         screenStopShortcut = ScreenStopShortcut { [weak self] in self?.stopScreenSession() }
         screenSession.setStopShortcutAvailable(screenStopShortcut?.isRegistered == true)
         screenSession.objectWillChange.sink { [weak self] _ in
@@ -72,7 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !companionPanel.isVisible { showPopover() }
+        if !companionPanel.isVisible { showShelfHome() }
         return true
     }
 
@@ -81,7 +82,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         showShelfHome()
     }
 
-    func applicationWillTerminate(_ notification: Notification) { stopAllScreenAccess(); voiceInput.cancel(); ArchiveService.shared.cancel(); chat.shutdown() }
+    func applicationWillTerminate(_ notification: Notification) {
+        if let dwellEventMonitor { NSEvent.removeMonitor(dwellEventMonitor) }
+        stopAllScreenAccess(); voiceInput.cancel(); ArchiveService.shared.cancel(); chat.shutdown()
+    }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let archive = ArchiveService.shared
         guard archive.isCompressing || screenSession.capture.isRunning || screenSession.capture.isSelecting || screenSession.capture.isStopping else { return .terminateNow }
@@ -142,18 +146,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupCompanionPanel() {
         companionPanel = CompanionPanel(contentRect: NSRect(x: 0, y: 0, width: panelSize.width, height: panelSize.height), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         companionPanel.title = "蓝匣主面板"
+        companionPanel.identifier = .lanxiaPanel
         companionPanel.isReleasedWhenClosed = false
         companionPanel.isOpaque = false
         companionPanel.backgroundColor = .clear
         companionPanel.hasShadow = true
         companionPanel.level = .floating
+        companionPanel.acceptsMouseMovedEvents = true
         companionPanel.hidesOnDeactivate = false
         companionPanel.becomesKeyOnlyIfNeeded = false
-        companionPanel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
-        companionHost = NSHostingView(rootView: CompanionView(navigation: navigation, chat: chat, shelf: shelf, reminders: reminders, mail: mail, voiceInput: voiceInput, screenSession: screenSession, onClose: { [weak self] in self?.hideCompanion() }, onHome: { [weak self] in self?.showShelfHome() }, onSettings: { [weak self] in self?.showSettings() }, onMailReminder: { [weak self] item in self?.prepareMailReminder(item) }, onMailAnalyze: { [weak self] item in self?.analyzeMail(item) }))
-        settingsHost = NSHostingView(rootView: CompanionSettingsView(chat: chat, voiceInput: voiceInput, onDisableAI: { [weak self] in self?.disableAI() }, onBack: { [weak self] in self?.showShelfHome() }, onClose: { [weak self] in self?.hideCompanion() }))
-        glassHost = GlassPanelHost(content: companionHost)
-        companionPanel.contentView = glassHost
+        companionPanel.collectionBehavior = [.canJoinAllSpaces, .canJoinAllApplications, .fullScreenAuxiliary]
+        let content = CompanionView(
+            navigation: navigation, chat: chat, shelf: shelf, reminders: reminders, mail: mail,
+            voiceInput: voiceInput, screenSession: screenSession,
+            onClose: { [weak self] in self?.hideCompanion() },
+            onToggleExpanded: { [weak self] in self?.toggleExpandedPanel() },
+            onActivateAI: { [weak self] in self?.activateAI() },
+            onDisableAI: { [weak self] in self?.disableAI() },
+            onMailReminder: { [weak self] item in self?.prepareMailReminder(item) },
+            onMailAnalyze: { [weak self] item in self?.analyzeMail(item) }
+        )
+        companionPanel.contentView = GlassPanelHost(content: NSHostingView(rootView: content))
     }
 
     private func setupStatusItem() {
@@ -166,7 +179,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         target.onClick = { [weak self] in self?.togglePopover() }
         target.onHover = { [weak self] in
             guard let self, !self.companionPanel.isVisible, NSApp.modalWindow == nil else { return }
-            self.showPopover()
+            self.showCompanion(page: .home, focus: false)
         }
         target.onFiles = { [weak self] urls in
             guard let self else { return }
@@ -175,15 +188,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         button.addSubview(target)
         statusDropTarget = target
-        popover.behavior = .transient
-        popover.contentSize = NSSize(width: 420, height: 530)
-        popover.contentViewController = NSHostingController(rootView: MenuShelfView(
-            shelf: shelf, chat: chat, reminders: reminders, screenSession: screenSession,
-            onActivateAI: { [weak self] in self?.activateAI() },
-            onDisableAI: { [weak self] in self?.disableAI() },
-            onOpen: { [weak self] page in self?.showCompanion(page: page, focus: true) },
-            onSettings: { [weak self] in self?.showSettings() }
-        ))
         updateScreenIndicator()
     }
 
@@ -201,28 +205,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showShelfHome() {
-        hideCompanion()
-        showPopover()
+        showCompanion(page: .home, focus: true)
     }
 
     private func showCompanion(page: CompanionPage, focus: Bool) {
         guard chat.isEnabled || (page != .chat && page != .screen) else { showShelfHome(); return }
-        popover.performClose(nil)
+        guard companionPanel.attachedSheet == nil else { return }
         navigation.page = page
-        glassHost.setContent(companionHost)
-        revealCompanion(focus: focus)
+        if !companionPanel.isVisible { revealCompanion(focus: focus) }
+        else if focus && !companionPanel.isKeyWindow { companionPanel.makeKey() }
     }
     private func revealCompanion(focus: Bool) {
         positionCompanion()
         companionPanel.orderFrontRegardless()
-        if focus { companionPanel.makeKey() }
+        if focus && !companionPanel.isKeyWindow { companionPanel.makeKey() }
     }
     private func showSettings() {
-        popover.performClose(nil)
-        voiceInput.cancel()
-        endScreenCapture()
-        glassHost.setContent(settingsHost)
-        revealCompanion(focus: true)
+        showCompanion(page: .settings, focus: true)
     }
     private func prepareMailReminder(_ item: MailItem) {
         reminders.prepareDraft(title: item.displaySubject, notes: "来自 \(item.displaySender)\n\(item.webLink)")
@@ -245,7 +244,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         showCompanion(page: .chat, focus: true)
         Task { await chat.send(prompt) }
     }
-    private func hideCompanion() { endScreenCapture(); voiceInput.cancel(); companionPanel.orderOut(nil) }
+    private func hideCompanion() {
+        NotificationCenter.default.post(name: .cancelDwellActivation, object: nil)
+        endScreenCapture(); voiceInput.cancel(); companionPanel.orderOut(nil)
+    }
     @objc private func stopScreenSession() { endScreenCapture(); screenSession.stop() }
 
     @objc private func stopAllScreenAccess() {
@@ -284,18 +286,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { await voiceInput.start() }
     }
 
-    private func positionCompanion() {
+    private func toggleExpandedPanel() {
+        guard companionPanel.attachedSheet == nil else { return }
+        navigation.isExpanded.toggle()
+        positionCompanion(animate: !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+    }
+
+    private func positionCompanion(animate: Bool = false) {
         let button = statusItem.button
         let anchor = button.flatMap { button in
             button.window?.convertToScreen(button.convert(button.bounds, to: nil))
         }
         guard let screen = button?.window?.screen ?? NSScreen.main else { return }
         let visible = screen.visibleFrame.insetBy(dx: 8, dy: 8)
+        if navigation.isExpanded {
+            companionPanel.setFrame(visible, display: true, animate: animate)
+            return
+        }
         let size = NSSize(width: min(panelSize.width, visible.width), height: min(panelSize.height, visible.height))
         let left = min(max((anchor?.midX ?? visible.midX) - size.width / 2, visible.minX), visible.maxX - size.width)
         let top = min(visible.maxY, (anchor?.minY ?? visible.maxY) - 6)
         let frame = NSRect(x: left, y: max(visible.minY, top - size.height), width: size.width, height: size.height)
-        companionPanel.setFrame(frame, display: true)
+        companionPanel.setFrame(frame, display: true, animate: animate)
     }
 
     @objc private func screenLayoutChanged() {
@@ -303,22 +315,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if companionPanel.isVisible { positionCompanion() }
     }
     private func togglePopover() {
-        if popover.isShown { popover.performClose(nil) }
+        guard companionPanel.attachedSheet == nil else { return }
+        if companionPanel.isVisible, navigation.page == .home { hideCompanion() }
         else { showShelfHome() }
-    }
-    private func showPopover() {
-        guard !popover.isShown, let button = statusItem.button else { return }
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
     }
     @objc private func openMain() { showShelfHome() }
     @objc private func openSettings() { showSettings() }
     @objc private func openShelfPopover() { togglePopover() }
     @objc private func revealAfterFileSelection() {
-        if companionPanel.isVisible { revealCompanion(focus: true) } else { showPopover() }
+        if companionPanel.isVisible, companionPanel.attachedSheet == nil { revealCompanion(focus: true) }
     }
     @objc private func showCompression() { showCompanion(page: .files, focus: true) }
     @objc private func showAbout() {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.1.0"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.2.0"
         NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "蓝匣", .applicationVersion: version, .credits: NSAttributedString(string: "菜单栏文件中转站 · DeepSeek Harness\n日程提醒 · ZIP 文件压缩 · Outlook 邮件")])
     }
 }

@@ -84,9 +84,10 @@ final class ShelfStore: ObservableObject {
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
-        if panel.runModal() == .OK {
+        panel.beginInLanxia { response in
+            guard response == .OK else { return }
             let urls = panel.urls
-            Task { await importURLs(urls) }
+            Task { await self.importURLs(urls) }
         }
     }
 
@@ -273,5 +274,24 @@ final class ShelfStore: ObservableObject {
             }
         }
         return result
+    }
+}
+
+extension NSUserInterfaceItemIdentifier {
+    static let lanxiaPanel = Self("LanxiaMainPanel")
+}
+
+extension NSSavePanel {
+    @MainActor func beginInLanxia(completion: @escaping @MainActor (NSApplication.ModalResponse) -> Void) {
+        guard let owner = NSApp.windows.first(where: { $0.identifier == .lanxiaPanel && $0.isVisible }) else {
+            begin(completionHandler: completion)
+            return
+        }
+        guard owner.attachedSheet == nil else { completion(.cancel); return }
+        owner.makeKey()
+        beginSheetModal(for: owner) { response in
+            self.orderOut(nil)
+            DispatchQueue.main.async { completion(response) }
+        }
     }
 }

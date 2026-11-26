@@ -68,7 +68,7 @@ private let panelCornerRadius: CGFloat = 24
         let view: NSView
         if #available(macOS 26.0, *), next == .glass {
             let glass = NSGlassEffectView(frame: bounds)
-            glass.style = .regular
+            glass.style = .clear
             glass.cornerRadius = panelCornerRadius
             view = glass
         } else if next == .material {
@@ -122,8 +122,8 @@ private final class SolidPanelBackdrop: NSView {
 }
 
 extension View {
-    /// Smaller surfaces stay clear; important controls use a regular glass
-    /// backing. Solid system surfaces take precedence for accessibility.
+    /// Cards share the panel's glass and use a translucent fill for separation.
+    /// Solid system surfaces take precedence for accessibility.
     func stashGlassSurface(cornerRadius: CGFloat = 14, emphasis: Bool = false) -> some View {
         modifier(StashGlassSurface(cornerRadius: cornerRadius, emphasis: emphasis))
     }
@@ -164,6 +164,11 @@ private struct StashGlassSurface: ViewModifier {
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.colorScheme) private var colorScheme
 
+    private var fillOpacity: Double {
+        if colorScheme == .dark { return emphasis ? 0.32 : 0.18 }
+        return emphasis ? 0.38 : 0.23
+    }
+
     @ViewBuilder func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         if reduceTransparency || contrast == .increased {
@@ -171,16 +176,8 @@ private struct StashGlassSurface: ViewModifier {
                 .background(Color(nsColor: .windowBackgroundColor), in: shape)
                 .overlay(shape.strokeBorder(Color.primary.opacity(contrast == .increased ? 0.5 : 0.18), lineWidth: 1))
         } else {
-            surface(content, in: shape)
-                .background {
-                    if emphasis {
-                        shape.fill(.black.opacity(colorScheme == .dark ? 0.19 : 0.075))
-                            .blur(radius: 7)
-                            .offset(y: 3)
-                            .allowsHitTesting(false)
-                            .accessibilityHidden(true)
-                    }
-                }
+            content
+                .background(Color(nsColor: .windowBackgroundColor).opacity(fillOpacity), in: shape)
                 .overlay {
                     shape.strokeBorder(
                         LinearGradient(stops: [
@@ -193,14 +190,6 @@ private struct StashGlassSurface: ViewModifier {
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
                 }
-        }
-    }
-
-    @ViewBuilder private func surface(_ content: Content, in shape: RoundedRectangle) -> some View {
-        if #available(macOS 26.0, *) {
-            content.glassEffect(emphasis ? .regular : .clear, in: shape)
-        } else {
-            content.background(.thinMaterial, in: shape)
         }
     }
 }
@@ -218,13 +207,21 @@ private struct StashGlassPanelEdge: ViewModifier {
         content
             .background {
                 if !usesSolidSurface {
-                    GeometryReader { geometry in
-                        shape.fill(RadialGradient(
-                            colors: [Color(red: 0.83, green: 0.95, blue: 1)
-                                .opacity(colorScheme == .dark ? 0.10 : 0.28), .clear],
-                            center: .topLeading, startRadius: 0,
-                            endRadius: min(geometry.size.width * 0.77, 360)
-                        ))
+                    ZStack {
+                        if #available(macOS 26.0, *) {
+                            // Clear glass exposes more of the desktop. The scheme-matched
+                            // backing keeps labels legible across varied wallpapers.
+                            shape.fill(Color(nsColor: .windowBackgroundColor)
+                                .opacity(colorScheme == .dark ? 0.66 : 0.74))
+                        }
+                        GeometryReader { geometry in
+                            shape.fill(RadialGradient(
+                                colors: [Color(red: 0.83, green: 0.95, blue: 1)
+                                    .opacity(colorScheme == .dark ? 0.07 : 0.15), .clear],
+                                center: .topLeading, startRadius: 0,
+                                endRadius: min(geometry.size.width * 0.77, 360)
+                            ))
+                        }
                     }
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
