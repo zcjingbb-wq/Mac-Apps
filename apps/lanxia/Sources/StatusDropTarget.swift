@@ -15,7 +15,7 @@ final class StatusDropTarget: NSView {
         registerForDraggedTypes([.fileURL])
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
-        setAccessibilityLabel("羽，打开文件中转站")
+        setAccessibilityLabel("Wings，打开文件中转站")
     }
 
     required init?(coder: NSCoder) { fatalError() }

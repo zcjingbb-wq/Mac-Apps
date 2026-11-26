@@ -237,7 +237,7 @@ private final class OutlookRPC {
         }
         process = worker
         do { try worker.run() } catch { close(); throw OutlookError.noCodex }
-        _ = try await request("initialize", ["clientInfo": ["name": "stashcat-outlook", "title": "羽只读邮件", "version": "2.0.0"], "capabilities": ["experimentalApi": true]])
+        _ = try await request("initialize", ["clientInfo": ["name": "stashcat-outlook", "title": "Wings 只读邮件", "version": "2.0.0"], "capabilities": ["experimentalApi": true]])
         try write(["method": "initialized"])
     }
 

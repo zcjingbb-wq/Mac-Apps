@@ -45,7 +45,7 @@ import AppKit
             return true
         }
         image.isTemplate = true
-        image.accessibilityDescription = "羽"
+        image.accessibilityDescription = "Wings"
         return image
     }()
 }

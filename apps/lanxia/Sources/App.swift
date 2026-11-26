@@ -109,9 +109,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "关于羽", action: #selector(showAbout), keyEquivalent: "")
+        appMenu.addItem(withTitle: "关于 Wings", action: #selector(showAbout), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "打开羽", action: #selector(openMain), keyEquivalent: "0")
+        appMenu.addItem(withTitle: "打开 Wings", action: #selector(openMain), keyEquivalent: "0")
         let shelfShortcut = NSMenuItem(title: "菜单栏中转站", action: #selector(openShelfPopover), keyEquivalent: "f")
         shelfShortcut.keyEquivalentModifierMask = [.command, .shift]
         appMenu.addItem(shelfShortcut)
@@ -126,7 +126,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(stopScreenShortcut)
         appMenu.addItem(withTitle: "设置…", action: #selector(openSettings), keyEquivalent: ",")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "退出羽", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "退出 Wings", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appMenu.items.forEach { if $0.action != #selector(NSApplication.terminate(_:)) { $0.target = self } }
         appItem.submenu = appMenu
         menu.addItem(appItem)
@@ -145,7 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupCompanionPanel() {
         companionPanel = CompanionPanel(contentRect: NSRect(x: 0, y: 0, width: panelSize.width, height: panelSize.height), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        companionPanel.title = "羽主面板"
+        companionPanel.title = "Wings 主面板"
         companionPanel.identifier = .lanxiaPanel
         companionPanel.isReleasedWhenClosed = false
         companionPanel.isOpaque = false
@@ -257,11 +257,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func updateScreenIndicator(fileCount: Int? = nil) {
         let active = screenSession.capture.isRunning || screenSession.capture.isSelecting || screenSession.capture.isStopping
-        let label = active ? "羽 · 屏幕会话进行中 · 打开后可停止" : "羽 · \(fileCount ?? shelf.items.count) 个暂存文件 · 悬停或点击打开 · 可拖入文件"
+        let label = active ? "Wings · 屏幕会话进行中 · 打开后可停止" : "Wings · \(fileCount ?? shelf.items.count) 个暂存文件 · 悬停或点击打开 · 可拖入文件"
         statusItem?.button?.toolTip = label
-        statusItem?.button?.setAccessibilityLabel("羽")
+        statusItem?.button?.setAccessibilityLabel("Wings")
         statusItem?.button?.setAccessibilityHelp(label)
-        statusDropTarget?.setAccessibilityLabel("羽")
+        statusDropTarget?.setAccessibilityLabel("Wings")
         statusDropTarget?.setAccessibilityHelp(label)
     }
 
@@ -327,8 +327,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc private func showCompression() { showCompanion(page: .files, focus: true) }
     @objc private func showAbout() {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.2.2"
-        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "羽", .applicationVersion: version, .credits: NSAttributedString(string: "菜单栏文件中转站 · DeepSeek Harness\n日程提醒 · ZIP 文件压缩 · Outlook 邮件")])
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.2.3"
+        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "Wings", .applicationVersion: version, .credits: NSAttributedString(string: "菜单栏文件中转站 · DeepSeek Harness\n日程提醒 · ZIP 文件压缩 · Outlook 邮件")])
     }
 }
 

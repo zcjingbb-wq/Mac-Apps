@@ -20,7 +20,7 @@ enum ScreenCaptureFailure: Error, LocalizedError, Equatable {
         switch self {
         case .cancelled: return "已取消屏幕选择。"
         case .permissionDenied:
-            return "请在系统设置 → 隐私与安全性 → 屏幕与系统音频录制中允许羽，必要时退出 App 后重新打开，再主动选择要读取的窗口或显示器。"
+            return "请在系统设置 → 隐私与安全性 → 屏幕与系统音频录制中允许 Wings，必要时退出 App 后重新打开，再主动选择要读取的窗口或显示器。"
         case .unavailable: return "无法读取所选内容。请确认窗口仍在显示，再重新选择。"
         case .invalidContent: return "所选窗口或显示器尺寸无效，请重新选择。"
         case .invalidImage: return "这次没有取得可用画面，请重新选择。"

@@ -78,7 +78,7 @@ final class ShelfStore: ObservableObject {
     func importWithPanel() {
         guard !isImporting, canMutate else { return }
         let panel = NSOpenPanel()
-        panel.title = "添加到羽"
+        panel.title = "添加到 Wings"
         panel.prompt = "暂存副本"
         panel.message = "文件和文件夹会复制到本机暂存区，原文件会保留。"
         panel.canChooseFiles = true

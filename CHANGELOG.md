@@ -2,6 +2,8 @@
 
 ## 2026-11-26
 
+- **Wings 2.2.3（Build 25）** · 应用更名为「Wings」。详见[Wings 更新日志](apps/lanxia/CHANGELOG.md)。
+
 - **羽 2.2.2（Build 24）** · 应用更名为「羽」，更新座天使像素画应用图标和黑白像素小翅膀菜单栏图标。详见[羽更新日志](apps/lanxia/CHANGELOG.md)。
 
 - **蓝匣 2.2.1（Build 22）** · 更新高清红白像素球应用图标，菜单栏轮播草、火、水三款原创剪影。详见[蓝匣更新日志](apps/lanxia/CHANGELOG.md)。

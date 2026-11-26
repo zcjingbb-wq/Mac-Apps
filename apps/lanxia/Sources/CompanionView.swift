@@ -112,7 +112,7 @@ struct CompanionView: View {
             Button("清空对话", role: .destructive) { chat.clearConversation() }
             Button("取消", role: .cancel) { }
         } message: {
-            Text("只清空 \(chat.provider.displayName) 在羽中的记录。")
+            Text("只清空 \(chat.provider.displayName) 在 Wings 中的记录。")
         }
     }
 
@@ -197,7 +197,7 @@ struct CompanionView: View {
             .accessibilityLabel("回到菜单栏首页")
             .disabled(page == .home)
             Image(nsImage: StatusBarIcon.image()).accessibilityHidden(true)
-            Text("羽")
+            Text("Wings")
                 .font(.system(size: 15, weight: .bold, design: .rounded))
                 .stashHighlightedText()
             Text(page.title)

@@ -3,7 +3,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 PROJECT_DIR="$(dirname -- "$SCRIPT_DIR")"
 BUILD_DIR="${STASHCAT_BUILD_DIR:-/tmp/StashCat-build}"
-APP_PATH="$BUILD_DIR/羽.app"
+APP_PATH="$BUILD_DIR/Wings.app"
 TASK_SDK_PATH="${STASHCAT_SDK_PATH:-$(xcrun --show-sdk-path)}"
 # This Mac's CLT SDK 27 exposes SwiftUI.State macros but lacks SwiftUIMacros.
 # The installed 26.5 SDK supports the macOS 14 baseline and guarded macOS 26 glass APIs; keep this choice

@@ -63,7 +63,7 @@ struct MenuShelfView: View {
 
             Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }
                 .buttonStyle(.plain).font(.system(size: 11))
-                .accessibilityLabel("退出羽").help("退出羽")
+                .accessibilityLabel("退出 Wings").help("退出 Wings")
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 8)
@@ -113,7 +113,7 @@ struct SettingsView: View {
                 Text("暂存站保存文件副本。移除暂存项时，副本会移到废纸篓。")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
             }
-            Text("羽 \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.2.2")")
+            Text("Wings \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.2.3")")
                 .font(.system(size: 10)).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity).padding(.vertical, 5)
         }
