@@ -1,6 +1,6 @@
 # 蓝匣
 
-蓝匣（原暂存喵）是 Apple Silicon Mac 上的菜单栏工具。鼠标在蓝黄像素图标上停留约 0.35 秒会打开文件中转站。也可点击图标打开，或直接把文件拖到图标上暂存。首页提供添加、搜索、ZIP 压缩、日程提醒与 Outlook 邮件入口。
+蓝匣（原暂存喵）是 Apple Silicon Mac 上的菜单栏工具。鼠标在菜单栏剪影图标上停留约 0.35 秒会打开文件中转站。也可点击图标打开，或直接把文件拖到图标上暂存。首页提供添加、搜索、ZIP 压缩、日程提醒与 Outlook 邮件入口。
 
 ## 悬停与全屏空间
 
@@ -21,7 +21,7 @@
 
 DeepSeek 路径使用官方 [DeepSeek Harness 0.2.2-rc.5](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.2-rc.5) 与 DeepSeek API。在聊天附件和屏幕助手中，DeepSeek 接收由设备提取的文字。Codex 可接收所选图片。两个提供方的对话记录在本机分别保存。
 
-暂存文件、副本、提醒、邮件缓存及对话历史位于 `~/Library/Application Support/StashCat`。旧对话记录可在那里查阅。菜单栏图标以 GBA 像素风绘制，取材自第四世代先机球。应用图标将同一像素球置于深蓝玻璃底与托盘上。
+暂存文件、副本、提醒、邮件缓存及对话历史位于 `~/Library/Application Support/StashCat`。旧对话记录可在那里查阅。应用图标是 GBA 像素风的原创红白捕捉球。菜单栏每四秒轮换草、火、水三款原创像素剪影，使用 macOS 模板图标自动适应菜单栏明暗。
 
 ## 构建与回归
 
@@ -30,7 +30,7 @@ DeepSeek 路径使用官方 [DeepSeek Harness 0.2.2-rc.5](https://github.com/dee
 如需重新生成应用图标，在蓝匣源码目录运行以下命令。
 
 ```sh
-xcrun swiftc -parse-as-library Sources/StatusBarIcon.swift Scripts/make-icon.swift -o /tmp/stashcat-make-icon
+xcrun swiftc -parse-as-library Scripts/make-icon.swift -o /tmp/stashcat-make-icon
 /tmp/stashcat-make-icon "$PWD"
 iconutil -c icns Resources/AppIcon.iconset -o Resources/StashCatGlass.icns
 ```

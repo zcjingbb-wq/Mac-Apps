@@ -28,6 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusDropTarget: StatusDropTarget?
     private lazy var chat = ChatCoordinator(deepseek: ai, codex: codex)
     private var statusItem: NSStatusItem!
+    private var statusIconTimer: Timer?
+    private var statusIconIndex = 0
     private var companionPanel: CompanionPanel!
     private let panelSize = NSSize(width: 420, height: 560)
     private var isWaitingForCompressionToQuit = false
@@ -83,6 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        statusIconTimer?.invalidate()
         if let dwellEventMonitor { NSEvent.removeMonitor(dwellEventMonitor) }
         stopAllScreenAccess(); voiceInput.cancel(); ArchiveService.shared.cancel(); chat.shutdown()
     }
@@ -189,6 +192,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         button.addSubview(target)
         statusDropTarget = target
         updateScreenIndicator()
+        let timer = Timer(timeInterval: 4, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.advanceStatusIcon() }
+        }
+        timer.tolerance = 0.25
+        RunLoop.main.add(timer, forMode: .common)
+        statusIconTimer = timer
+    }
+
+    private func advanceStatusIcon() {
+        let frames = StatusBarIcon.frames
+        statusIconIndex = (statusIconIndex + 1) % frames.count
+        statusItem.button?.image = frames[statusIconIndex]
     }
 
     private func activateAI() {
@@ -327,7 +342,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc private func showCompression() { showCompanion(page: .files, focus: true) }
     @objc private func showAbout() {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.2.0"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.2.1"
         NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "蓝匣", .applicationVersion: version, .credits: NSAttributedString(string: "菜单栏文件中转站 · DeepSeek Harness\n日程提醒 · ZIP 文件压缩 · Outlook 邮件")])
     }
 }

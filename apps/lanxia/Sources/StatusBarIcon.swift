@@ -1,61 +1,91 @@
 import AppKit
 
 @MainActor enum StatusBarIcon {
-    // Original pixel art for the status bar, sized to whole points at 1× and 2×.
-    private static let pixels = [
-        "..................",
-        "......OOOOO.....Y.",
-        "....OOHHBBBOO..YYW",
-        "...OHHBBBBYDCO..Y.",
-        "..OHWBBBYWWDCCO...",
-        ".OHBBBYWWYDCCCO...",
-        ".OBBYWWYDDCCCCDO..",
-        ".OBYWWYDDCCCDDCO..",
-        ".OBWYBDDCCCCDDCO..",
-        ".OIDDDOOOIIIDDDO..",
-        ".ODDDOWWYOIDCCDO..",
-        ".ODCCOWYYODCCCO...",
-        "..OCCDOOODCCDO....",
-        "...OCCDDDDCDO.....",
-        "....OOCCCCOO......",
-        "......OOOO........",
-        "..................",
-        ".................."
-    ]
-
-    private static let palette: [Character: NSColor] = [
-        "O": .init(srgbRed: 0.05, green: 0.15, blue: 0.26, alpha: 1),
-        "H": .init(srgbRed: 0.61, green: 0.93, blue: 0.98, alpha: 1),
-        "B": .init(srgbRed: 0.25, green: 0.72, blue: 0.93, alpha: 1),
-        "C": .init(srgbRed: 0.15, green: 0.53, blue: 0.79, alpha: 1),
-        "D": .init(srgbRed: 0.12, green: 0.36, blue: 0.60, alpha: 1),
-        "I": .init(srgbRed: 0.08, green: 0.23, blue: 0.40, alpha: 1),
-        "Y": .init(srgbRed: 1, green: 0.72, blue: 0.18, alpha: 1),
-        "W": .init(srgbRed: 1, green: 0.94, blue: 0.58, alpha: 1)
-    ]
+    static let frames = [leafHare, emberFox, waveOtter].map(makeImage)
 
     static func image() -> NSImage {
-        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { rect in
+        frames[0]
+    }
+
+    private static func makeImage(pixels: [String]) -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size, flipped: true) { rect in
             NSGraphicsContext.saveGraphicsState()
             defer { NSGraphicsContext.restoreGraphicsState() }
             NSGraphicsContext.current?.shouldAntialias = false
+            NSColor.black.setFill()
 
-            let xStep = rect.width / 18
-            let yStep = rect.height / 18
+            // Each sprite uses a 16-point grid with a one-point transparent border.
+            let width = rect.width / size.width
+            let height = rect.height / size.height
             for (row, line) in pixels.enumerated() {
-                for (column, pixel) in line.enumerated() {
-                    guard let color = palette[pixel] else { continue }
-                    color.setFill()
-                    NSRect(x: rect.minX + CGFloat(column) * xStep,
-                           y: rect.minY + CGFloat(row) * yStep,
-                           width: xStep,
-                           height: yStep).fill()
+                for (column, pixel) in line.enumerated() where pixel == "#" {
+                    NSRect(x: rect.minX + CGFloat(column + 1) * width,
+                           y: rect.minY + CGFloat(row + 1) * height,
+                           width: width, height: height).fill()
                 }
             }
             return true
         }
-        image.isTemplate = false
+        image.isTemplate = true
         image.accessibilityDescription = "蓝匣"
         return image
     }
+
+    private static let leafHare = [
+        "................",
+        ".......#...##...",
+        "......###.###...",
+        "......##.###....",
+        "......##.##.....",
+        ".......###......",
+        ".......#####....",
+        ".....########...",
+        "....#######.##..",
+        "...############.",
+        ".#.############.",
+        ".#############..",
+        "..###########...",
+        "...###########..",
+        "....###..#####..",
+        "................"
+    ]
+
+    private static let emberFox = [
+        "................",
+        ".............#..",
+        "..##.##.....##..",
+        "..##.###...##.#.",
+        "..######..##.##.",
+        "..##.###..#####.",
+        ".########...###.",
+        "..###########...",
+        "...##########...",
+        ".....########...",
+        ".....########...",
+        ".....###...##...",
+        ".....##....###..",
+        "....###...###...",
+        "................",
+        "................"
+    ]
+
+    private static let waveOtter = [
+        "................",
+        "................",
+        ".........#..#...",
+        "........######..",
+        ".......###.####.",
+        ".......########.",
+        "...##.####.###..",
+        "..###########...",
+        "...#######......",
+        "....########....",
+        ".##...###..##...",
+        "###..####.####..",
+        "###########.###.",
+        ".####..#######..",
+        "...##....###....",
+        "................"
+    ]
 }
